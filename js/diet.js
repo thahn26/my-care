@@ -69,6 +69,8 @@ function renderHome() {
     </div>
   </section>
 
+  ${renderTodayPlan(cur)}
+
   ${soon.length ? `<section class="card">
     <div class="card-h"><h2>유통기한 임박</h2><button class="link small" data-action="kitchen" data-sub="fridge">냉장고 ›</button></div>
     <div class="alert-list">${soon.slice(0, 5).map(f => { const dd = dday(f.exp); return `<div class="alert-item"><span><b>${esc(f.name)}</b> <span class="small muted">${n1(f.qty)}${esc(f.unit)}</span></span><span class="dday ${dd.cls}">${dd.text}</span></div>`; }).join('')}</div>
@@ -166,7 +168,7 @@ function openMeal(type, id) {
         <label class="field"><span>칼로리 (kcal)</span><input id="mKcal" inputmode="numeric" placeholder="자동 또는 직접" value="${m.kcal}"></label>
         <label class="field"><span>단백질 (g)</span><input id="mProt" inputmode="decimal" placeholder="자동 또는 직접" value="${m.protein}"></label>
       </div>
-      <button class="btn ai block" data-x="ai" ${busy ? 'disabled' : ''} style="margin-bottom:14px">${busy ? '<span class="spinner"></span> AI가 보고 있어요…' : '✨ AI로 칼로리·단백질 추정'}</button>
+      ${db.settings.apiKey ? `<button class="btn ai block" data-x="ai" ${busy ? 'disabled' : ''} style="margin-bottom:14px">${busy ? '<span class="spinner"></span> AI가 보고 있어요…' : '✨ AI로 칼로리·단백질 추정'}</button>` : ''}
       ${aiNote ? `<div class="ai-note">${aiNote}</div>` : ''}
       <label class="field"><span>메모</span><input id="mMemo" placeholder="선택" value="${esc(m.memo || '')}"></label>
       <div class="btn-row"><button class="btn" data-x="toggleFav">${isFav() ? '★ 자주 먹는 메뉴에서 빼기' : '☆ 자주 먹는 메뉴로 저장'}</button></div>

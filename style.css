@@ -395,3 +395,33 @@ button.photo-pick { aspect-ratio: auto; height: 96px; }
   .fr-front { display: none; }
   .anim .fr-door, .anim .fr-lamp, .anim .fi { animation: none; }
 }
+
+/* ── 빠른 추가 ── */
+.qa-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 4px; padding-bottom: 8px; }
+.fi.qa { width: auto; padding: 6px 2px 4px; background: var(--card); border: 1.5px solid transparent; }
+.fi.qa.on { border-color: var(--kitchen); background: color-mix(in srgb, var(--kitchen) 10%, var(--card)); }
+.qa-count { position: absolute; top: 2px; right: 4px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--kitchen); color: #fff; font-size: 11px; font-weight: 800; line-height: 18px; }
+.qa-plus { font-size: 10px; color: var(--accent); font-weight: 700; }
+.qa-foot { position: sticky; bottom: calc(-24px - var(--safe-b)); margin: 0 -16px; padding: 10px 16px calc(14px + var(--safe-b)); background: var(--bg); border-top: .5px solid var(--line); }
+.qa-tray { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; max-height: 76px; overflow-y: auto; }
+.qa-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 4px 4px 10px; border-radius: 99px; background: var(--fill); font-size: 13px; font-weight: 600; }
+.qa-chip button { width: 22px; height: 22px; border-radius: 50%; background: var(--card); color: var(--danger); font-weight: 800; }
+
+/* ── 식단 짜기 ── */
+.plan-grid { width: 100%; border-collapse: collapse; }
+.plan-grid th { font-size: 12px; font-weight: 700; color: var(--sub); padding: 4px 2px; text-align: center; }
+.plan-grid tbody th { text-align: left; color: var(--text); white-space: nowrap; }
+.plan-grid tbody th.we { color: var(--danger); }
+.plan-grid td { text-align: center; padding: 3px; }
+.pg { width: 100%; max-width: 64px; height: 36px; border-radius: 10px; background: var(--fill); display: inline-grid; place-items: center; }
+.pg svg { width: 18px; height: 18px; fill: none; stroke: #fff; stroke-width: 3; }
+.pg.on { background: var(--kitchen); }
+.plan-day { padding: 10px 0; border-top: .5px solid var(--line); }
+.plan-day:first-child { border-top: 0; padding-top: 2px; }
+.plan-day.compact { padding: 8px 0; }
+.plan-slot { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 0; text-align: left; }
+.ps-meal { flex: none; width: 58px; font-size: 13px; color: var(--sub); font-weight: 600; }
+.ps-name { flex: 1; min-width: 0; font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ps-name small { color: var(--sub); font-weight: 500; font-size: 12px; }
+.link-row .chev { color: var(--muted); }
+.ok-badge { font-size: 12px; font-weight: 700; color: var(--ok); }

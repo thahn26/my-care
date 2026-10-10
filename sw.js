@@ -1,9 +1,9 @@
 // 오프라인 지원: 앱 파일은 네트워크 우선, 실패하면 캐시 (AI 요청 등 외부 요청은 건드리지 않음)
-const CACHE = 'my-care-v1';
+const CACHE = 'my-care-v2';
 const ASSETS = [
   './', './index.html', './style.css', './manifest.webmanifest',
   './data/foods.js', './data/recipes.js', './data/food-art.js',
-  './js/store.js', './js/ai.js', './js/ui.js', './js/diet.js', './js/kitchen.js', './js/app.js',
+  './js/store.js', './js/ai.js', './js/ui.js', './js/diet.js', './js/kitchen.js', './js/planner.js', './js/app.js',
   './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',
 ];
 self.addEventListener('install', (e) => {

@@ -99,27 +99,6 @@ async function aiEstimateMeal({ photo, name }) {
   }), 'low');
 }
 
-// 2) 냉장고·장바구니·영수증 사진 → 재료 목록
-async function aiScanFridge(photoList) {
-  const content = photoList.map(imageBlock);
-  content.push({ type: 'text', text:
-    `오늘은 ${today()}입니다. 사진(냉장고 안, 장 본 물건, 또는 영수증)에서 식재료를 모두 찾아 목록으로 정리해 주세요.\n` +
-    `- name: 일반적인 재료명(예: "달걀", "두부", "닭가슴살", "대파"). 상표명은 빼세요.\n` +
-    `- qty, unit: 보이는 수량(예: 10, "개" / 1, "팩" / 300, "g"). 모르면 1, "개".\n` +
-    `- loc: 보관 위치 "냉장" | "냉동" | "실온".\n` +
-    `- exp: 유통기한 YYYY-MM-DD. 포장에 날짜가 보이면 그 날짜(expEstimated=false), 안 보이면 오늘 기준 일반 보관 기간으로 추정(expEstimated=true).\n` +
-    `- 조미료·소스류(간장, 소금, 케첩 등)와 음식이 아닌 물건은 빼세요.\n` +
-    `- note: 사진에 대한 짧은 한 줄 메모(예: "영수증에서 7개 품목을 찾았어요").` });
-  return askAI(content, obj({
-    items: { type: 'array', items: obj({
-      name: S, qty: N, unit: S,
-      loc: { type: 'string', enum: ['냉장', '냉동', '실온'] },
-      exp: S, expEstimated: B,
-    }) },
-    note: S,
-  }), 'low');
-}
-
 function fridgeSummary() {
   if (!db.fridge.length) return '(비어 있음)';
   return db.fridge.map(f => `${f.name} ${f.qty}${f.unit}${f.exp ? ` (유통기한 ${f.exp})` : ''}`).join(', ');

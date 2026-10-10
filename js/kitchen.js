@@ -56,7 +56,7 @@ function renderFridgeArt() {
   const by = (z) => sortFridge(db.fridge.filter(f => zoneOf(f) === z));
   const shelf = (z, loc, cls = '') => {
     const items = by(z);
-    return `<div class="shelf ${cls}"><span class="shelf-lbl">${ZONES[z]}</span><div class="shelf-items">${items.map(f => fridgeChip(f)).join('')}${items.length ? '' : `<button class="fi add" data-action="addTo" data-loc="${loc}" aria-label="${ZONES[z]}에 재료 추가">＋</button>`}</div></div>`;
+    return `<div class="shelf ${cls}"><span class="shelf-lbl">${ZONES[z]}</span><div class="shelf-items">${items.map(f => fridgeChip(f)).join('')}${items.length ? '' : `<button class="fi add" data-action="quickAdd" data-loc="${loc}" aria-label="${ZONES[z]}에 재료 추가">＋</button>`}</div></div>`;
   };
   const door = by('door'), pockets = [[], [], []];
   door.forEach((f, i) => pockets[i % 3].push(f));
@@ -75,13 +75,13 @@ function renderFridgeArt() {
         </div>
       </div>
       <div class="fr-freezer">
-        <div class="shelf"><span class="shelf-lbl">냉동실 ❄️</span><div class="shelf-items">${by('freezer').map(f => fridgeChip(f)).join('')}${by('freezer').length ? '' : '<button class="fi add" data-action="addTo" data-loc="냉동" aria-label="냉동실에 재료 추가">＋</button>'}</div></div>
+        <div class="shelf"><span class="shelf-lbl">냉동실 ❄️</span><div class="shelf-items">${by('freezer').map(f => fridgeChip(f)).join('')}${by('freezer').length ? '' : '<button class="fi add" data-action="quickAdd" data-loc="냉동" aria-label="냉동실에 재료 추가">＋</button>'}</div></div>
         <div class="fz-front"><span class="fz-handle"></span></div>
       </div>
     </div>
     <div class="fr-feet" aria-hidden="true"><i></i><i></i></div>
     <div class="pantry">
-      <div class="shelf-items">${pantry.map(f => fridgeChip(f)).join('')}<button class="fi add" data-action="addTo" data-loc="실온" aria-label="실온 선반에 재료 추가">＋</button></div>
+      <div class="shelf-items">${pantry.map(f => fridgeChip(f)).join('')}<button class="fi add" data-action="quickAdd" data-loc="실온" aria-label="실온 선반에 재료 추가">＋</button></div>
       <div class="plank"></div><span class="shelf-lbl">실온 선반</span>
     </div>
   </div>`;
@@ -92,8 +92,8 @@ function renderFridge() {
   const soon = db.fridge.filter(f => f.exp && diffDays(f.exp, today()) <= 5).length;
   return `
   <div class="big-actions">
-    <button class="big-action ai" data-action="scanFridge"><span class="ic">📷</span><b>사진으로 등록</b><span>냉장고·장 본 것·영수증을 찍으면 AI가 정리</span></button>
-    <button class="big-action" data-action="editItem"><span class="ic">＋</span><b>직접 추가</b><span>이름·수량·유통기한 입력</span></button>
+    <button class="big-action" data-action="quickAdd" style="background:var(--kitchen);color:#fff"><span class="ic">🧺</span><b>빠른 추가</b><span style="color:rgba(255,255,255,.9)">그림을 톡톡 눌러 담기</span></button>
+    <button class="big-action" data-action="editItem"><span class="ic">✏️</span><b>직접 입력</b><span>이름·수량·유통기한 입력</span></button>
   </div>
   <div class="row-between" style="margin-bottom:10px">
     <div class="seg" style="margin:0;flex:none">
@@ -102,7 +102,7 @@ function renderFridge() {
     </div>
     <span class="small muted num">전체 ${db.fridge.length}개${soon ? ` · <b style="color:var(--danger)">임박 ${soon}</b>` : ''}</span>
   </div>
-  ${view === 'art' ? renderFridgeArt() + (db.fridge.length ? '' : '<p class="small muted" style="text-align:center;margin:8px 0 0">냉장고가 비어 있어요. 사진을 찍으면 AI가 칸마다 정리해 줘요.</p>') : renderFridgeList()}
+  ${view === 'art' ? renderFridgeArt() + (db.fridge.length ? '' : '<p class="small muted" style="text-align:center;margin:8px 0 0">냉장고가 비어 있어요. ‘빠른 추가’로 재료를 톡톡 담아 보세요.</p>') : renderFridgeList()}
   <p class="small muted" style="margin:12px 4px 0">재료를 눌러 <b>★ 상비 재료</b>로 지정하면, 다 썼을 때 장보기 목록에 자동으로 들어가요.</p>`;
 }
 
@@ -124,7 +124,7 @@ function renderFridgeList() {
         </button>
         ${dd ? `<span class="dday ${dd.cls}">${dd.text}</span>` : ''}
       </li>`;
-    }).join('')}</ul>` : `<p class="empty">${db.fridge.length ? '이 칸은 비어 있어요' : '냉장고가 비어 있어요.<br>사진을 찍으면 AI가 재료를 정리해 줘요.'}</p>`}
+    }).join('')}</ul>` : `<p class="empty">${db.fridge.length ? '이 칸은 비어 있어요' : '냉장고가 비어 있어요.<br>‘빠른 추가’로 재료를 톡톡 담아 보세요.'}</p>`}
   </section>`;
 }
 
@@ -204,74 +204,6 @@ async function thrownAway(item) {
   }
 }
 
-// ── AI 사진 등록 ──
-async function scanFridge() {
-  if (!db.settings.apiKey) {
-    if (await ask('AI 사진 등록에는 API 키가 필요해요', '설정에서 Anthropic API 키를 넣어 주세요. 키 없이도 ‘직접 추가’로 등록할 수 있어요.', '설정 열기', '나중에')) openSettings();
-    return;
-  }
-  const files = await pickImages({ multiple: true });
-  if (!files.length) return;
-  const panel = openSheet(sheetHeader('사진 분석 중') + loadingCard(`사진 ${files.length}장에서 재료를 찾고 있어요`));
-  let result;
-  try {
-    const imgs = [];
-    for (const f of files.slice(0, 5)) imgs.push(await compressImage(f, 1280, 0.8));
-    result = await aiScanFridge(imgs);
-  } catch (err) {
-    if (!$('#sheet').classList.contains('open')) return;
-    panel.innerHTML = sheetHeader('사진 분석 실패') + `<div class="card"><p>${esc(err.message)}</p><button class="btn primary block" data-x="retry">다시 시도</button></div>`;
-    panel.querySelector('[data-x="retry"]').onclick = () => { closeSheet(); scanFridge(); };
-    panel.querySelector('[data-x="close"]').onclick = closeSheet;
-    return;
-  }
-  if (!$('#sheet').classList.contains('open')) return;
-  reviewScan(panel, result);
-}
-
-function reviewScan(panel, result) {
-  const items = result.items.map(r => ({ ...r, on: true, qty: r.qty || 1, unit: r.unit || '개' }));
-  const draw = () => {
-    const n = items.filter(i => i.on).length;
-    panel.innerHTML = sheetHeader('AI가 찾은 재료', `<button class="link strong" data-x="add" ${n ? '' : 'disabled'}>넣기</button>`) + `
-      ${result.note ? `<div class="ai-note">${esc(result.note)}</div>` : ''}
-      ${items.length ? `<div class="card">${items.map((it, i) => `<div class="review-item ${it.on ? '' : 'off'}" data-i="${i}">
-        <div class="top-line"><button class="check ${it.on ? 'on' : ''}" data-x="toggle" aria-label="선택">${CHECK_SVG}</button><input class="input" data-f="name" value="${esc(it.name)}"></div>
-        <div class="seg">${LOCS.map(l => `<button data-x="loc" data-v="${l}" class="${l === it.loc ? 'on' : ''}">${l}</button>`).join('')}</div>
-        <div class="three"><input class="input" data-f="qty" inputmode="decimal" value="${it.qty}" aria-label="수량"><input class="input" data-f="unit" value="${esc(it.unit)}" aria-label="단위"><input class="input" data-f="exp" type="date" value="${esc(it.exp)}" aria-label="유통기한"></div>
-        ${it.expEstimated ? '<div class="small muted" style="margin-top:4px">유통기한은 추정값이에요</div>' : ''}
-      </div>`).join('')}</div>` : '<p class="empty">사진에서 재료를 찾지 못했어요. 더 가까이 찍어 보세요.</p>'}
-      <button class="btn primary block" data-x="add" ${n ? '' : 'disabled'}>냉장고에 넣기 (${n}개)</button>`;
-  };
-  panel.oninput = (e) => {
-    const row = e.target.closest('[data-i]'), f = e.target.dataset.f;
-    if (!row || !f) return;
-    const it = items[+row.dataset.i];
-    if (f === 'exp' && e.target.value !== it.exp) it.expEstimated = false;
-    it[f] = f === 'qty' ? (+e.target.value || 0) : e.target.value;
-  };
-  panel.onclick = (e) => {
-    const b = e.target.closest('[data-x]');
-    if (!b) return;
-    const x = b.dataset.x, row = b.closest('[data-i]'), it = row && items[+row.dataset.i];
-    if (x === 'close') return closeSheet();
-    if (x === 'toggle') { it.on = !it.on; draw(); }
-    else if (x === 'loc') { it.loc = b.dataset.v; draw(); }
-    else if (x === 'add') {
-      const chosen = items.filter(i => i.on && i.name.trim());
-      let bought = 0;
-      for (const c of chosen) {
-        const prevStaple = db.fridge.some(f => f.staple && nameMatch(f.name, c.name));
-        db.fridge.push({ id: uid(), name: c.name.trim(), qty: c.qty || 1, unit: c.unit || '개', loc: c.loc, exp: c.exp || '', expEst: !!c.expEstimated, staple: prevStaple, added: today() });
-        for (const s of db.shopping) if (!s.done && nameMatch(s.name, c.name)) { s.done = true; bought++; }
-      }
-      save(); closeSheet(); render();
-      toast(`${chosen.length}개를 냉장고에 넣었어요${bought ? ` · 장보기 ${bought}개 완료` : ''}`);
-    }
-  };
-  draw();
-}
-
 // ── 요리 추천 ──
 function recipeView(r, ai = false) {
   // 내장 레시피와 AI 레시피를 같은 모양으로
@@ -310,7 +242,8 @@ function renderRecipes() {
   });
   const ai = db.aiRecipes || [];
   return `
-  <button class="big-action ai" data-action="aiRecipes" style="width:100%;margin-bottom:12px"><span class="ic">✨</span><b>AI에게 맞춤 추천받기</b><span>냉장고 재료 · 오늘 남은 칼로리 · 부족한 단백질을 반영해요</span></button>
+  ${renderPlanCard()}
+  ${db.settings.apiKey ? '<button class="big-action ai" data-action="aiRecipes" style="width:100%;margin-bottom:12px"><span class="ic">✨</span><b>AI에게 맞춤 추천받기</b><span>냉장고 재료 · 오늘 남은 칼로리 · 부족한 단백질을 반영해요</span></button>' : ''}
   ${ai.length ? `<section class="card"><div class="card-h"><h2>AI 추천</h2><button class="link small" data-action="clearAiRecipes">지우기</button></div>
     ${ai.map((r, i) => recipeRow(recipeView(r, true), 'a' + i)).join('')}</section>` : ''}
   <div class="chips scroll" style="margin-bottom:12px">${RECIPE_FILTERS.map(([k, l]) => `<button class="chip ${k === f ? 'on' : ''}" data-action="recipeFilter" data-v="${k}">${l}</button>`).join('')}</div>
@@ -323,7 +256,7 @@ function recipeByKey(key) {
   const r = RECIPES[+key.slice(1)]; return r && recipeView(r);
 }
 
-function openRecipe(key) {
+function openRecipe(key, meal) {
   const v = recipeByKey(key);
   if (!v) return;
   const sc = scoreRecipe(v);
@@ -351,7 +284,7 @@ function openRecipe(key) {
       save(); closeSheet(); render();
       toast(added ? `${added}개를 장보기에 담았어요` : '이미 장보기 목록에 있어요');
     }
-    if (b.dataset.x === 'cook') openCooked(v);
+    if (b.dataset.x === 'cook') openCooked(v, meal);
   };
 }
 
@@ -364,10 +297,10 @@ function parseAmount(a, unit) {
   if (/반/.test(a)) return 0.5;
   return 1;
 }
-function openCooked(v) {
+function openCooked(v, meal) {
   const uses = v.ing.map(([n, a]) => { const f = fridgeHas(n); return f ? { f, take: Math.min(f.qty, parseAmount(a, f.unit)), mode: 'some' } : null; }).filter(Boolean);
   for (const u of uses) if (u.f.qty - u.take <= 0) u.mode = 'all';
-  let mealType = mealTypeNow(), logMeal = true;
+  let mealType = meal || mealTypeNow(), logMeal = true;
   const panel = openSheet('');
   const draw = () => {
     panel.innerHTML = sheetHeader('요리 완료', '<button class="link strong" data-x="done">완료</button>', '<button class="link" data-x="close">취소</button>') + `
@@ -448,15 +381,17 @@ function openAiRecipeAsk() {
 // ── 장보기 ──
 function renderShop() {
   const left = db.shopping.filter(s => !s.done), done = db.shopping.filter(s => s.done);
+  const unstocked = done.filter(s => !s.stocked).length;
   const row = (s) => `<div class="shop-item ${s.done ? 'done' : ''}">
     <button class="check ${s.done ? 'on' : ''}" data-action="shopToggle" data-id="${s.id}" aria-label="${s.done ? '안 산 것으로' : '샀어요'}">${CHECK_SVG}</button>
     <div class="info"><div class="name">${esc(s.name)} ${s.qty ? `<span class="muted small">${esc(s.qty)}</span>` : ''}</div>${s.src ? `<div class="src">${esc(s.src)}</div>` : ''}</div>
     <button class="x-btn" data-action="shopDel" data-id="${s.id}" aria-label="삭제">×</button></div>`;
   return `
   <div class="big-actions">
-    <button class="big-action ai" data-action="aiShopping"><span class="ic">✨</span><b>이번 주 장보기 추천</b><span>냉장고와 단백질 목표를 보고 AI가 목록 작성</span></button>
-    <button class="big-action" data-action="scanFridge"><span class="ic">🧾</span><b>영수증으로 넣기</b><span>산 것을 찍으면 냉장고로 한 번에</span></button>
+    <button class="big-action" data-action="openPlanner" style="background:var(--kitchen);color:#fff"><span class="ic">🗓</span><b>이번 주 식단 짜고 장보기</b><span style="color:rgba(255,255,255,.9)">요일별 끼니를 고르면 자동 계산</span></button>
+    <button class="big-action" data-action="stockBought"><span class="ic">🧊</span><b>산 것 냉장고로</b><span>${unstocked ? `체크한 ${unstocked}개를 한 번에` : '산 것을 체크하면 한 번에 넣어요'}</span></button>
   </div>
+  ${db.settings.apiKey ? '<button class="big-action ai" data-action="aiShopping" style="width:100%;margin-bottom:12px"><span class="ic">✨</span><b>AI 장보기 추천</b><span>냉장고와 단백질 목표를 보고 AI가 목록 작성</span></button>' : ''}
   <form class="card" id="shopForm" style="display:flex;gap:8px;padding:10px">
     <input class="input" id="shopInput" placeholder="살 것 직접 추가 (예: 두부 2모)" enterkeyhint="done" style="flex:1">
     <button class="btn primary sm" type="submit">추가</button>
@@ -481,13 +416,9 @@ async function toggleShop(id) {
   if (!s) return;
   s.done = !s.done; save(); render();
   if (!s.done) return;
-  // 샀으면 냉장고에 넣을지 물어보기
-  const qtyNum = parseFloat(s.qty) || 1;
-  const unitGuess = (String(s.qty).match(/[가-힣a-zA-Z]+/) || ['개'])[0];
-  toast(`${s.name} 샀어요`, { label: '냉장고에 넣기', run: () => {
-    const staple = db.fridge.some(f => f.staple && nameMatch(f.name, s.name));
-    openItem(null, { name: s.name, qty: qtyNum, unit: UNITS.includes(unitGuess) ? unitGuess : '개', exp: guessExp(s.name, '냉장'), expEst: true, staple });
-  } });
+  // 샀으면 바로 냉장고에 넣을 수 있게
+  if (s.stocked) return;
+  toast(`${s.name} 샀어요`, { label: '냉장고에 넣기', run: () => { stockShopping([s]); } });
 }
 
 async function aiShopping() {
@@ -525,4 +456,117 @@ async function aiShopping() {
     }
   };
   draw();
+}
+
+// ── 빠른 추가 (그림을 눌러 냉장고에 담기) ──
+// [이름, 기본 단위, 기본 보관, 분류]
+const QUICK = [
+  ['대파', '단', '냉장', '채소'], ['양파', '개', '실온', '채소'], ['마늘', '봉', '냉장', '채소'], ['당근', '개', '냉장', '채소'],
+  ['오이', '개', '냉장', '채소'], ['애호박', '개', '냉장', '채소'], ['브로콜리', '송이', '냉장', '채소'], ['양배추', '통', '냉장', '채소'],
+  ['양상추', '통', '냉장', '채소'], ['시금치', '단', '냉장', '채소'], ['버섯', '팩', '냉장', '채소'], ['파프리카', '개', '냉장', '채소'],
+  ['토마토', '개', '냉장', '채소'], ['방울토마토', '팩', '냉장', '채소'], ['감자', '개', '실온', '채소'], ['고구마', '개', '실온', '채소'],
+  ['무', '개', '냉장', '채소'], ['콩나물', '봉', '냉장', '채소'], ['단호박', '개', '실온', '채소'], ['아보카도', '개', '실온', '과일'],
+  ['바나나', '송이', '실온', '과일'], ['사과', '개', '냉장', '과일'], ['귤', '개', '냉장', '과일'], ['딸기', '팩', '냉장', '과일'],
+  ['블루베리', '팩', '냉동', '과일'], ['레몬', '개', '냉장', '과일'],
+  ['닭가슴살', '팩', '냉동', '고기·생선'], ['닭안심', '팩', '냉장', '고기·생선'], ['소고기', '팩', '냉장', '고기·생선'], ['돼지고기', '팩', '냉장', '고기·생선'],
+  ['연어', '토막', '냉장', '고기·생선'], ['고등어', '토막', '냉장', '고기·생선'], ['흰살생선', '토막', '냉동', '고기·생선'], ['새우', '봉', '냉동', '고기·생선'],
+  ['오징어', '마리', '냉동', '고기·생선'], ['훈제연어', '팩', '냉장', '고기·생선'], ['햄', '개', '냉장', '고기·생선'], ['소시지', '봉', '냉장', '고기·생선'],
+  ['달걀', '개', '냉장', '달걀·두부·유제품'], ['메추리알', '팩', '냉장', '달걀·두부·유제품'], ['두부', '모', '냉장', '달걀·두부·유제품'], ['연두부', '팩', '냉장', '달걀·두부·유제품'],
+  ['순두부', '봉', '냉장', '달걀·두부·유제품'], ['우유', '개', '냉장', '달걀·두부·유제품'], ['무가당 두유', '팩', '냉장', '달걀·두부·유제품'], ['그릭요거트', '통', '냉장', '달걀·두부·유제품'],
+  ['치즈', '장', '냉장', '달걀·두부·유제품'], ['코티지치즈', '통', '냉장', '달걀·두부·유제품'], ['버터', '개', '냉장', '달걀·두부·유제품'],
+  ['햇반', '개', '실온', '밥·면·빵'], ['쌀', '봉', '실온', '밥·면·빵'], ['식빵', '봉', '실온', '밥·면·빵'], ['통밀빵', '봉', '실온', '밥·면·빵'],
+  ['두부면', '팩', '냉장', '밥·면·빵'], ['칼국수면', '봉', '냉장', '밥·면·빵'], ['라면', '개', '실온', '밥·면·빵'], ['만두', '봉', '냉동', '밥·면·빵'], ['오트밀', '봉', '실온', '밥·면·빵'],
+  ['김치', '통', '냉장', '기타'], ['참치캔', '캔', '실온', '기타'], ['견과류', '봉', '실온', '기타'], ['김', '봉', '실온', '기타'],
+  ['단백질 파우더', '통', '실온', '기타'], ['들깨가루', '봉', '냉장', '기타'], ['꿀', '병', '실온', '기타'], ['주스', '개', '냉장', '기타'], ['생수', '병', '실온', '기타'],
+];
+const QUICK_CATS = ['전체', '채소', '과일', '고기·생선', '달걀·두부·유제품', '밥·면·빵', '기타'];
+function quickInfo(name) { return QUICK.find(q => q[0] === name) || QUICK.find(q => nameMatch(q[0], name)); }
+
+// 냉장고에 넣기: 같은 이름·보관·단위가 있으면 수량을 합치고 유통기한은 더 이른 날짜로
+function putInFridge({ name, qty = 1, unit, loc }) {
+  const info = quickInfo(name);
+  unit = unit || info?.[1] || '개';
+  loc = loc || info?.[2] || '냉장';
+  const exp = guessExp(name, loc);
+  const same = db.fridge.find(f => f.name === name && f.loc === loc && f.unit === unit);
+  if (same) {
+    same.qty = Math.round((same.qty + qty) * 10) / 10;
+    if (exp && (!same.exp || exp < same.exp)) { same.exp = exp; same.expEst = true; }
+    return same;
+  }
+  const staple = db.fridge.some(f => f.staple && nameMatch(f.name, name));
+  const it = { id: uid(), name, qty, unit, loc, exp, expEst: !!exp, staple, added: today() };
+  db.fridge.push(it);
+  return it;
+}
+function markBought(name) { for (const s of db.shopping) if (!s.done && nameMatch(s.name, name)) { s.done = true; s.stocked = true; } }
+
+function openQuickAdd(presetLoc) {
+  let cat = '전체', q = '', locMode = presetLoc || '자동';
+  const picked = new Map(); // 이름 → 개수
+  const panel = openSheet('');
+  const listHtml = () => {
+    const items = QUICK.filter(it => (cat === '전체' || it[3] === cat) && (!q || it[0].includes(q)));
+    const custom = q && !QUICK.some(it => it[0] === q) ? `<button class="fi qa" data-x="pick" data-n="${esc(q)}"><span class="fi-art">${artOf(q)}</span><span class="fi-name">${esc(q)}</span><span class="qa-plus">＋ 새로</span></button>` : '';
+    return items.map(([n]) => `<button class="fi qa ${picked.get(n) ? 'on' : ''}" data-x="pick" data-n="${esc(n)}"><span class="fi-art">${artOf(n)}</span><span class="fi-name">${esc(n)}</span>${picked.get(n) ? `<span class="qa-count">${picked.get(n)}</span>` : ''}</button>`).join('') + custom;
+  };
+  const trayHtml = () => {
+    const total = [...picked.values()].reduce((a, b) => a + b, 0);
+    return picked.size ? `<div class="qa-tray">${[...picked].map(([n, c]) => `<span class="qa-chip">${esc(n)} ${c}${esc(quickInfo(n)?.[1] || '개')}<button data-x="minus" data-n="${esc(n)}" aria-label="${esc(n)} 하나 빼기">−</button></span>`).join('')}</div>
+      <button class="btn primary block" data-x="done">냉장고에 넣기 (${picked.size}종 ${total}개)</button>` : '<p class="small muted" style="text-align:center;margin:6px 0">그림을 누를 때마다 1개씩 담겨요</p>';
+  };
+  const draw = () => {
+    panel.innerHTML = sheetHeader('빠른 추가', '', '<button class="link" data-x="close">닫기</button>') + `
+      <div class="field" style="margin-bottom:10px"><input id="qaSearch" class="input" placeholder="찾기 또는 새 재료 이름" value="${esc(q)}" autocomplete="off"></div>
+      <div class="seg" style="margin-bottom:10px">${['자동', ...LOCS].map(l => `<button data-x="loc" data-v="${l}" class="${l === locMode ? 'on' : ''}">${l === '자동' ? '보관 자동' : l}</button>`).join('')}</div>
+      <div class="chips scroll" style="margin-bottom:10px">${QUICK_CATS.map(c => `<button class="chip ${c === cat ? 'on' : ''}" data-x="cat" data-v="${c}">${c}</button>`).join('')}</div>
+      <div class="qa-grid" id="qaGrid">${listHtml()}</div>
+      <div class="qa-foot" id="qaFoot">${trayHtml()}</div>`;
+  };
+  const refresh = () => { panel.querySelector('#qaGrid').innerHTML = listHtml(); panel.querySelector('#qaFoot').innerHTML = trayHtml(); };
+  panel.addEventListener('input', (e) => { if (e.target.id === 'qaSearch') { q = e.target.value.trim(); refresh(); } });
+  panel.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-x]');
+    if (!b) return;
+    const x = b.dataset.x;
+    if (x === 'close') return closeSheet();
+    if (x === 'cat') { cat = b.dataset.v; draw(); }
+    else if (x === 'loc') { locMode = b.dataset.v; draw(); }
+    else if (x === 'pick') { const n = b.dataset.n; picked.set(n, (picked.get(n) || 0) + 1); refresh(); }
+    else if (x === 'minus') { const n = b.dataset.n, c = (picked.get(n) || 0) - 1; c > 0 ? picked.set(n, c) : picked.delete(n); refresh(); }
+    else if (x === 'done') {
+      for (const [n, c] of picked) { putInFridge({ name: n, qty: c, loc: locMode === '자동' ? null : locMode }); markBought(n); }
+      save(); closeSheet(); fridgeAnim = false; render();
+      toast(`${picked.size}가지를 냉장고에 넣었어요 · 유통기한은 추정값이라 재료를 눌러 고칠 수 있어요`);
+    }
+  });
+  draw();
+}
+
+// 장보기에서 산 것 → 냉장고
+// 장보기 수량 글자 → 냉장고 수량 ('10구 1판' → 달걀 10개, '900ml 1개' → 1개, '3공기 분량' → 햇반 3개)
+function shopQty(s) {
+  const t = String(s.qty || '');
+  const eggs = t.match(/(\d+)\s*구/);
+  if (eggs) return { qty: +eggs[1], unit: '개' };
+  const rice = t.match(/(\d+)\s*공기/);
+  if (rice) return { qty: +rice[1], unit: '개', name: '햇반' };
+  const cnt = t.match(/(\d+(?:\.\d+)?)\s*(개|모|팩|봉|캔|통|단|송이|토막|병|장|마리)/);
+  if (cnt) return { qty: +cnt[1], unit: cnt[2] };
+  return { qty: 1, unit: null };
+}
+function stockShopping(list) {
+  let n = 0;
+  for (const s of list) {
+    const q = shopQty(s), info = quickInfo(q.name || s.name);
+    putInFridge({ name: q.name || info?.[0] || s.name, qty: q.qty, unit: q.unit || info?.[1] || '개' });
+    s.done = true; s.stocked = true; n++;
+  }
+  save(); render();
+  toast(n ? `${n}개를 냉장고에 넣었어요` : '냉장고에 넣을 산 것이 없어요');
+}
+function stockBought() {
+  const list = db.shopping.filter(s => s.done && !s.stocked);
+  if (!list.length) return toast('장보기 목록에서 산 것을 먼저 체크해 주세요');
+  stockShopping(list);
 }

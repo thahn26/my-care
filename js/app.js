@@ -1,5 +1,5 @@
 // 화면 전환 · 공통 이벤트 · 설정 · 백업
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 let tab = (() => { try { return sessionStorage.getItem('tab') || 'home'; } catch (e) { return 'home'; } })();
 let cur = today();
 
@@ -55,7 +55,6 @@ document.addEventListener('click', (e) => {
     case 'fridgeView':
       if (b.dataset.v === 'art' && db.ui.fridgeView === 'list') fridgeAnim = true;
       db.ui.fridgeView = b.dataset.v; save(); render(); break;
-    case 'addTo': openItem(null, { loc: b.dataset.loc }); break;
     case 'fridgeLoc': db.ui.fridgeLoc = b.dataset.v; save(); render(); break;
     case 'editItem': openItem(b.dataset.id); break;
     case 'staple': {
@@ -64,7 +63,10 @@ document.addEventListener('click', (e) => {
       toast(f.staple ? `${f.name}: 상비 재료로 지정했어요` : '상비 재료에서 뺐어요');
       break;
     }
-    case 'scanFridge': scanFridge(); break;
+    case 'quickAdd': openQuickAdd(b.dataset.loc); break;
+    case 'stockBought': stockBought(); break;
+    case 'openPlanner': openPlanner(); break;
+    case 'planRecipe': openRecipe(b.dataset.key, b.dataset.meal); break;
     case 'recipeFilter': db.ui.recipeFilter = b.dataset.v; save(); render(); break;
     case 'recipe': openRecipe(b.dataset.key); break;
     case 'aiRecipes': openAiRecipeAsk(); break;
@@ -125,8 +127,9 @@ function openSettings() {
         <p class="small muted" id="curGoal" style="margin:10px 0 0">${curGoal()}</p>
       </section>
 
-      <div class="section-title">AI (사진 분석 · 레시피 · 장보기 추천)</div>
+      <div class="section-title">AI (선택 · 유료)</div>
       <section class="card">
+        <p class="small" style="margin:0 0 10px">API 키 없이도 모든 기본 기능은 무료로 써요. 키를 넣으면 <b>칼로리 사진 추정 · AI 맞춤 레시피 · AI 장보기 추천</b> 버튼이 추가로 나타나요.</p>
         <label class="field"><span>Anthropic API 키</span><input data-s="apiKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(s.apiKey)}" placeholder="sk-ant-로 시작하는 키"></label>
         <label class="field"><span>AI 모델</span><select data-s="aiModel">${AI_MODELS.map(([id, l]) => `<option value="${id}" ${s.aiModel === id ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
         <p class="small muted" style="margin:0 0 8px">키는 이 아이폰에만 저장되고 백업 파일에는 들어가지 않아요. AI 버튼을 누를 때만 사진·재료 목록이 Anthropic으로 전송돼요.</p>
