@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="MY 관리">
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+<title>MY 관리</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="top-row">
+    <h1 id="title">MY 관리</h1>
+    <button class="icon-btn" data-action="settings" aria-label="설정">
+      <svg viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+    </button>
+  </div>
+  <div class="date-row" id="dateRow">
+    <button class="icon-btn sm" data-action="prev" aria-label="이전 날">‹</button>
+    <span id="dateLabel"></span>
+    <button class="icon-btn sm" data-action="next" id="nextBtn" aria-label="다음 날">›</button>
+    <button class="pill" data-action="today" id="todayBtn">오늘</button>
+  </div>
+</header>
+
+<main id="view"></main>
+
+<nav class="tabbar" id="tabbar">
+  <button data-action="tab" data-tab="home">
+    <svg viewBox="0 0 24 24"><path d="M3.5 10.5 12 3.5l8.5 7V20a1 1 0 0 1-1 1H15v-6H9v6H4.5a1 1 0 0 1-1-1z"/></svg><span>홈</span>
+  </button>
+  <button data-action="tab" data-tab="diet">
+    <svg viewBox="0 0 24 24"><path d="M3 12h18a9 8 0 0 1-18 0z"/><path d="M8.5 8c0-1.6 1.2-2.2 1.2-3.8M12.5 8c0-1.6 1.2-2.2 1.2-3.8"/></svg><span>식단</span>
+  </button>
+  <button data-action="tab" data-tab="kitchen">
+    <svg viewBox="0 0 24 24"><rect x="5" y="2.5" width="14" height="19" rx="2.5"/><path d="M5 10h14M8.5 6v1.5M8.5 13v3"/></svg><span>주방</span>
+  </button>
+</nav>
+
+<div id="sheet" class="sheet" aria-hidden="true"></div>
+<div id="toast" class="toast" role="status"></div>
+
+<script src="data/foods.js"></script>
+<script src="data/recipes.js"></script>
+<script src="data/food-art.js"></script>
+<script src="js/store.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/diet.js"></script>
+<script src="js/kitchen.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
