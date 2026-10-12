@@ -1,5 +1,5 @@
 // 화면 전환 · 공통 이벤트 · 설정 · 백업
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
 let tab = (() => { try { return sessionStorage.getItem('tab') || 'home'; } catch (e) { return 'home'; } })();
 let cur = today();
 
@@ -67,7 +67,12 @@ document.addEventListener('click', (e) => {
     case 'stockBought': stockBought(); break;
     case 'openPlanner': openPlanner(); break;
     case 'planRecipe': openRecipe(b.dataset.key, b.dataset.meal); break;
-    case 'recipeFilter': db.ui.recipeFilter = b.dataset.v; save(); render(); break;
+    case 'recipeTag': {
+      const t = b.dataset.v, cur2 = db.ui.recipeTags || [];
+      db.ui.recipeTags = cur2.includes(t) ? cur2.filter(x => x !== t) : [...cur2, t];
+      save(); render(); break;
+    }
+    case 'recipeTagClear': db.ui.recipeTags = []; save(); render(); break;
     case 'recipe': openRecipe(b.dataset.key); break;
     case 'aiRecipes': openAiRecipeAsk(); break;
     case 'clearAiRecipes': db.aiRecipes = []; save(); render(); break;

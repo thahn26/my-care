@@ -1,7 +1,24 @@
 // 주방: 냉장고 · 요리 추천 · 장보기
 const LOCS = ['냉장', '냉동', '실온'];
 const UNITS = ['개', '팩', '모', '봉', '캔', '병', '통', '단', 'g', 'kg', 'ml', 'L', '줄', '송이'];
-const RECIPE_FILTERS = [['all', '추천순'], ['ready', '바로 가능'], ['lunch', '도시락'], ['morning', '아침'], ['soup', '국·죽'], ['easy', '전자레인지·불 없이']];
+// 레시피 태그 (여러 개 골라 조합)
+const TAG_CHIPS = ['바로 가능', '속편한', '고단백', '다이어트', '든든한', '매콤한', '국물', '도시락', '10분', '전자레인지', '아침', '건강식', '간단한끼', '한식', '양식', '중식', '일식', '분식', '반찬'];
+function recipeTags(r) {
+  const tg = r.tag || [], t = new Set();
+  if (tg.includes('속편한')) t.add('속편한');
+  if (r.p >= 20 || tg.includes('고단백')) t.add('고단백');
+  if (r.k <= 400 || tg.includes('다이어트')) t.add('다이어트');
+  if (r.k >= 550 || tg.includes('든든')) t.add('든든한');
+  if (tg.includes('매콤')) t.add('매콤한');
+  if (tg.includes('국')) t.add('국물');
+  if (r.d) t.add('도시락');
+  if (r.t <= 10) t.add('10분');
+  if (tg.includes('전자레인지')) t.add('전자레인지');
+  if (tg.includes('아침')) t.add('아침');
+  for (const [key, label] of [['건강식', '건강식'], ['간단', '간단한끼'], ['한식', '한식'], ['양식', '양식'], ['중식', '중식'], ['일식', '일식'], ['분식', '분식']]) if (tg.includes(key)) t.add(label);
+  if (tg.includes('반찬') || tg.includes('상비반찬')) t.add('반찬');
+  return [...t];
+}
 
 function renderKitchen() {
   const sub = db.ui.kitchenTab || 'fridge';
@@ -207,8 +224,8 @@ async function thrownAway(item) {
 // ── 요리 추천 ──
 function recipeView(r, ai = false) {
   // 내장 레시피와 AI 레시피를 같은 모양으로
-  if (ai) return { name: r.name, k: r.kcal, p: r.protein, t: r.minutes, tags: r.lunchTip ? ['도시락'] : [], ing: r.ingredients.map(i => [i.name, i.amount]), s: r.seasoning, st: r.steps, tip: r.lunchTip, why: r.why, ai: true };
-  return { name: r.n, k: r.k, p: r.p, t: r.t, tags: r.tag, ing: r.i, s: r.s, st: r.st, tip: r.d || '', why: '', ai: false };
+  if (ai) return { name: r.name, k: r.kcal, p: r.protein, t: r.minutes, tags: r.lunchTip ? ['도시락'] : [], labels: recipeTags({ k: r.kcal, p: r.protein, t: r.minutes, d: r.lunchTip, tag: [] }), ing: r.ingredients.map(i => [i.name, i.amount]), s: r.seasoning, st: r.steps, tip: r.lunchTip, why: r.why, ai: true };
+  return { name: r.n, k: r.k, p: r.p, t: r.t, tags: r.tag, labels: recipeTags(r), ing: r.i, s: r.s, st: r.st, tip: r.d || '', why: '', ai: false };
 }
 // 유통기한이 지난 재료는 '있는 재료'로 치지 않는다
 function fridgeHas(name) { return db.fridge.find(f => covers(f.name, name) && !(f.exp && f.exp < today())); }
@@ -222,23 +239,20 @@ function recipeRow(v, key) {
   const sc = scoreRecipe(v);
   return `<button class="recipe" data-action="recipe" data-key="${key}">
     <div class="name">${v.ai ? '✨ ' : ''}${esc(v.name)}</div>
-    <div class="facts num"><span><b>${n0(v.k)}</b>kcal</span><span>단백질 <b>${n1(v.p)}</b>g</span><span>${v.t}분</span>${v.tip ? '<span class="tag-lunch">도시락 OK</span>' : ''}${sc.urgent ? '<span style="color:var(--danger);font-weight:700">임박 재료 사용</span>' : ''}</div>
+    <div class="facts num"><span><b>${n0(v.k)}</b>kcal</span><span>단백질 <b>${n1(v.p)}</b>g</span><span>${v.t}분</span>${sc.urgent ? '<span style="color:var(--danger);font-weight:700">임박 재료 사용</span>' : ''}</div>
+    <div class="r-tags">${(v.labels || []).filter(t => !['10분'].includes(t)).slice(0, 5).map(t => `<span class="r-tag ${t === '매콤한' ? 'hot' : t === '속편한' ? 'calm' : ''}">${t}</span>`).join('')}</div>
     ${db.fridge.length ? `<div class="have"><span class="muted">재료 ${sc.have}/${sc.total}</span><div class="bar"><i style="width:${sc.ratio * 100}%"></i></div></div>
     ${sc.missing.length ? `<div class="missing">없는 재료: ${sc.missing.map(esc).join(', ')}</div>` : '<div class="missing" style="color:var(--ok);font-weight:600">지금 바로 만들 수 있어요</div>'}` : ''}
   </button>`;
 }
 function renderRecipes() {
-  const f = db.ui.recipeFilter || 'all';
+  const sel = db.ui.recipeTags || [];
   let list = RECIPES.map((r, i) => ({ v: recipeView(r), key: 'r' + i }));
-  const tagHas = (v, ...t) => v.tags.some(x => t.includes(x));
-  if (f === 'ready') list = list.filter(x => scoreRecipe(x.v).ratio === 1);
-  if (f === 'lunch') list = list.filter(x => x.v.tip);
-  if (f === 'morning') list = list.filter(x => tagHas(x.v, '아침'));
-  if (f === 'soup') list = list.filter(x => tagHas(x.v, '국', '죽'));
-  if (f === 'easy') list = list.filter(x => tagHas(x.v, '전자레인지', '불 없이'));
+  for (const t of sel) list = t === '바로 가능' ? list.filter(x => scoreRecipe(x.v).ratio === 1) : list.filter(x => x.v.labels.includes(t));
+  // 냉장고 재료를 많이 쓰는 순 → 유통기한 임박 → 단백질
   list.sort((a, b) => {
     const sa = scoreRecipe(a.v), sb = scoreRecipe(b.v);
-    return (sb.ratio - sa.ratio) || (sb.urgent - sa.urgent) || (b.v.p - a.v.p);
+    return (sb.ratio - sa.ratio) || (sb.have - sa.have) || (sb.urgent - sa.urgent) || (b.v.p - a.v.p);
   });
   const ai = db.aiRecipes || [];
   return `
@@ -246,7 +260,8 @@ function renderRecipes() {
   ${db.settings.apiKey ? '<button class="big-action ai" data-action="aiRecipes" style="width:100%;margin-bottom:12px"><span class="ic">✨</span><b>AI에게 맞춤 추천받기</b><span>냉장고 재료 · 오늘 남은 칼로리 · 부족한 단백질을 반영해요</span></button>' : ''}
   ${ai.length ? `<section class="card"><div class="card-h"><h2>AI 추천</h2><button class="link small" data-action="clearAiRecipes">지우기</button></div>
     ${ai.map((r, i) => recipeRow(recipeView(r, true), 'a' + i)).join('')}</section>` : ''}
-  <div class="chips scroll" style="margin-bottom:12px">${RECIPE_FILTERS.map(([k, l]) => `<button class="chip ${k === f ? 'on' : ''}" data-action="recipeFilter" data-v="${k}">${l}</button>`).join('')}</div>
+  <div class="tag-filter">${TAG_CHIPS.map(t => `<button class="chip ${sel.includes(t) ? 'on' : ''}" data-action="recipeTag" data-v="${t}">${t}</button>`).join('')}</div>
+  <div class="row-between" style="margin:2px 4px 10px"><span class="small muted num">${sel.length ? `${sel.join(' + ')} · ` : ''}${list.length}개</span>${sel.length ? '<button class="link small" data-action="recipeTagClear">태그 지우기</button>' : ''}</div>
   ${!db.fridge.length ? '<p class="small muted" style="margin:0 4px 10px">냉장고에 재료를 넣으면 있는 재료가 많은 요리부터 보여 드려요.</p>' : ''}
   <section class="card">${list.length ? list.map(x => recipeRow(x.v, x.key)).join('') : '<p class="empty">조건에 맞는 레시피가 없어요</p>'}</section>
   <p class="small muted" style="margin:0 4px">모든 레시피는 속 편한 고단백 다이어트식이에요. 숟 = 밥숟가락, 컵 = 종이컵(약 180ml).</p>`;
@@ -476,7 +491,10 @@ const QUICK = [
   ['치즈', '장', '냉장', '달걀·두부·유제품'], ['코티지치즈', '통', '냉장', '달걀·두부·유제품'], ['버터', '개', '냉장', '달걀·두부·유제품'],
   ['햇반', '개', '실온', '밥·면·빵'], ['쌀', '봉', '실온', '밥·면·빵'], ['식빵', '봉', '실온', '밥·면·빵'], ['통밀빵', '봉', '실온', '밥·면·빵'],
   ['두부면', '팩', '냉장', '밥·면·빵'], ['칼국수면', '봉', '냉장', '밥·면·빵'], ['라면', '개', '실온', '밥·면·빵'], ['만두', '봉', '냉동', '밥·면·빵'], ['오트밀', '봉', '실온', '밥·면·빵'],
-  ['김치', '통', '냉장', '기타'], ['참치캔', '캔', '실온', '기타'], ['견과류', '봉', '실온', '기타'], ['김', '봉', '실온', '기타'],
+  ['다진 고기', '팩', '냉장', '고기·생선'], ['베이컨', '팩', '냉장', '고기·생선'], ['닭', '팩', '냉장', '고기·생선'], ['어묵', '봉', '냉장', '고기·생선'], ['멸치', '봉', '냉동', '고기·생선'],
+  ['부추', '단', '냉장', '채소'], ['깻잎', '봉', '냉장', '채소'], ['숙주', '봉', '냉장', '채소'], ['청경채', '봉', '냉장', '채소'],
+  ['떡볶이떡', '봉', '냉장', '밥·면·빵'], ['떡국떡', '봉', '냉동', '밥·면·빵'], ['파스타면', '봉', '실온', '밥·면·빵'], ['소면', '봉', '실온', '밥·면·빵'], ['우동면', '개', '냉장', '밥·면·빵'], ['당면', '봉', '실온', '밥·면·빵'], ['또띠아', '봉', '냉동', '밥·면·빵'],
+  ['김치', '통', '냉장', '기타'], ['단무지', '개', '냉장', '기타'], ['토마토소스', '병', '실온', '기타'], ['카레', '개', '실온', '기타'], ['진미채', '봉', '냉장', '기타'], ['미역', '봉', '실온', '기타'], ['참치캔', '캔', '실온', '기타'], ['견과류', '봉', '실온', '기타'], ['김', '봉', '실온', '기타'],
   ['단백질 파우더', '통', '실온', '기타'], ['들깨가루', '봉', '냉장', '기타'], ['꿀', '병', '실온', '기타'], ['주스', '개', '냉장', '기타'], ['생수', '병', '실온', '기타'],
 ];
 const QUICK_CATS = ['전체', '채소', '과일', '고기·생선', '달걀·두부·유제품', '밥·면·빵', '기타'];

@@ -425,3 +425,20 @@ button.photo-pick { aspect-ratio: auto; height: 96px; }
 .ps-name small { color: var(--sub); font-weight: 500; font-size: 12px; }
 .link-row .chev { color: var(--muted); }
 .ok-badge { font-size: 12px; font-weight: 700; color: var(--ok); }
+
+/* 태그 */
+.tag-filter { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.tag-filter .chip { padding: 5px 11px; font-size: 13px; }
+.r-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.r-tag { padding: 1px 7px; border-radius: 6px; background: var(--fill); font-size: 11px; font-weight: 700; color: var(--sub); }
+.r-tag.hot { background: color-mix(in srgb, var(--danger) 13%, transparent); color: var(--danger); }
+.r-tag.calm { background: color-mix(in srgb, var(--kcal) 15%, transparent); color: var(--ok); }
+.plan-summary { display: flex; gap: 8px; margin-bottom: 10px; }
+.plan-summary span { flex: 1; padding: 10px 12px; border-radius: 12px; font-size: 14px; font-weight: 600; text-align: center; }
+.plan-summary .ok { background: color-mix(in srgb, var(--kcal) 14%, var(--card)); color: var(--ok); }
+.plan-summary .need { background: color-mix(in srgb, var(--kitchen) 14%, var(--card)); color: var(--kitchen); }
+.plan-summary b { font-size: 18px; }
+.ps-name { white-space: normal; }
+.ps-badge { display: block; margin-top: 1px; font-size: 11px; font-weight: 700; }
+.ps-badge.ok { color: var(--ok); }
+.ps-badge.need { color: var(--kitchen); }
