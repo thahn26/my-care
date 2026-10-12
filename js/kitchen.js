@@ -40,8 +40,8 @@ const ZONES = { top: '위칸', mid: '가운데칸', fresh: '신선칸', veg: '�
 // 냉장 재료를 어느 칸에 둘지 (위에서부터 먼저 걸리는 규칙)
 const ZONE_RULES = [
   ['door', ['달걀', '계란', '메추리알', '우유', '두유', '주스', '음료', '소스', '케첩', '마요', '드레싱', '간장', '식초', '참기름', '들기름', '고추장', '쌈장', '맥주', '콜라', '사이다', '탄산', '생수']],
-  ['fresh', ['닭', '소고기', '돼지', '고기', '삼겹', '목살', '안심', '등심', '생선', '연어', '고등어', '대구', '삼치', '갈치', '새우', '오징어', '조개', '전복', '햄', '베이컨', '소시지', '어묵', '게맛살']],
-  ['veg', ['파', '양파', '마늘', '당근', '오이', '호박', '브로콜리', '양배추', '배추', '상추', '시금치', '버섯', '고추', '파프리카', '토마토', '감자', '무', '콩나물', '숙주', '깻잎', '미나리', '부추', '사과', '배', '귤', '딸기', '포도', '블루베리', '바나나', '키위', '레몬', '아보카도']],
+  ['fresh', ['닭', '소고기', '돼지', '고기', '삼겹', '목살', '안심', '등심', '차돌', '갈비', '우삼겹', '대패', '항정', '오리', '양고기', '다짐육', '생선', '연어', '고등어', '대구', '삼치', '갈치', '꽁치', '조기', '동태', '명태', '코다리', '가자미', '새우', '오징어', '낙지', '쭈꾸미', '문어', '조개', '바지락', '홍합', '전복', '햄', '베이컨', '소시지', '어묵', '게맛살']],
+  ['veg', ['파', '양파', '마늘', '당근', '오이', '호박', '브로콜리', '양배추', '배추', '상추', '시금치', '버섯', '새송이', '팽이', '표고', '느타리', '고추', '피망', '파프리카', '토마토', '감자', '고구마', '무', '콩나물', '숙주', '깻잎', '미나리', '부추', '가지', '연근', '우엉', '쑥갓', '청경채', '케일', '셀러리', '아스파라거스', '콜리플라워', '양상추', '로메인', '열무', '시래기', '냉이', '달래', '고사리', '도라지', '생강', '비트', '사과', '배', '귤', '딸기', '포도', '블루베리', '바나나', '키위', '레몬', '아보카도']],
   ['top', ['요거트', '요구르트', '치즈', '버터', '잼', '김치', '반찬', '두부']],
 ];
 function zoneOf(f) {
@@ -169,6 +169,7 @@ function openItem(id, preset = {}) {
       <label class="field"><span>유통기한 ${it.expEst ? '<span class="muted">(추정값 · 포장에 적힌 날짜로 고쳐 주세요)</span>' : ''}</span><input id="iExp" type="date" value="${it.exp || ''}"></label>
       <label class="field" style="display:flex;align-items:center;gap:10px"><input id="iStaple" type="checkbox" ${it.staple ? 'checked' : ''} style="width:22px;height:22px;-webkit-appearance:auto;appearance:auto">
         <span style="margin:0;color:var(--text);font-size:15px">★ 상비 재료 <span class="muted small">(다 쓰면 자동으로 장보기에 추가)</span></span></label>
+      ${orig ? recipesForIngHtml(orig.name) : ''}
       ${orig ? `<div class="btn-row" style="margin-top:6px"><button class="btn" data-x="used">✅ 다 썼어요</button><button class="btn" data-x="thrown">🗑 버렸어요</button></div>
         <button class="btn block danger sm" style="margin-top:8px" data-x="del">잘못 넣었어요 (그냥 삭제)</button>` : ''}`;
   }
@@ -195,6 +196,8 @@ function openItem(id, preset = {}) {
       save(); closeSheet(); render(); toast(orig ? '수정했어요' : '냉장고에 넣었어요');
     } else if (x === 'used') { closeSheet(); usedUp(orig); }
     else if (x === 'thrown') { closeSheet(); thrownAway(orig); }
+    else if (x === 'recipe') { openRecipe(b.dataset.key); }
+    else if (x === 'ingAll') { db.ui.recipeIng = orig.name; db.ui.recipeTags = []; db.ui.kitchenTab = 'recipes'; save(); closeSheet(); render(); window.scrollTo(0, 0); }
     else if (x === 'del') {
       db.fridge = db.fridge.filter(f => f.id !== orig.id); save(); closeSheet(); render(); toast('삭제했어요');
     }
@@ -246,8 +249,9 @@ function recipeRow(v, key) {
   </button>`;
 }
 function renderRecipes() {
-  const sel = db.ui.recipeTags || [];
+  const sel = db.ui.recipeTags || [], ingF = db.ui.recipeIng || '';
   let list = RECIPES.map((r, i) => ({ v: recipeView(r), key: 'r' + i }));
+  if (ingF) list = list.filter(x => x.v.ing.some(([n]) => covers(ingF, n)));
   for (const t of sel) list = t === '바로 가능' ? list.filter(x => scoreRecipe(x.v).ratio === 1) : list.filter(x => x.v.labels.includes(t));
   // 냉장고 재료를 많이 쓰는 순 → 유통기한 임박 → 단백질
   const hidden = list.filter(x => recipeBlocked(x.v.raw));
@@ -262,6 +266,7 @@ function renderRecipes() {
   ${db.settings.apiKey ? '<button class="big-action ai" data-action="aiRecipes" style="width:100%;margin-bottom:12px"><span class="ic">✨</span><b>AI에게 맞춤 추천받기</b><span>냉장고 재료 · 오늘 남은 칼로리 · 부족한 단백질을 반영해요</span></button>' : ''}
   ${ai.length ? `<section class="card"><div class="card-h"><h2>AI 추천</h2><button class="link small" data-action="clearAiRecipes">지우기</button></div>
     ${ai.map((r, i) => recipeRow(recipeView(r, true), 'a' + i)).join('')}</section>` : ''}
+  ${ingF ? `<div class="today-concern"><span>🥕 <b>${esc(ingF)}</b>${iGa(ingF)} 들어가는 요리</span><button class="link small" data-action="recipeIngClear">× 해제</button></div>` : ''}
   <div class="tag-filter">${TAG_CHIPS.map(t => `<button class="chip ${sel.includes(t) ? 'on' : ''}" data-action="recipeTag" data-v="${t}">${t}</button>`).join('')}</div>
   <div class="row-between" style="margin:2px 4px 10px"><span class="small muted num">${sel.length ? `${sel.join(' + ')} · ` : ''}${list.length}개</span>${sel.length ? '<button class="link small" data-action="recipeTagClear">태그 지우기</button>' : ''}</div>
   ${!db.fridge.length ? '<p class="small muted" style="margin:0 4px 10px">냉장고에 재료를 넣으면 있는 재료가 많은 요리부터 보여 드려요.</p>' : ''}
@@ -312,7 +317,7 @@ function openRecipe(key, meal) {
       return;
     }
     if (b.dataset.x === 'shop') {
-      const added = sc.missing.filter(n => addShopping(n, `레시피: ${v.name}`)).length;
+      const added = sc.missing.filter(n => !ANY_ING[normName(n)] && addShopping(n, `레시피: ${v.name}`)).length;
       save(); closeSheet(); render();
       toast(added ? `${added}개를 장보기에 담았어요` : '이미 장보기 목록에 있어요');
     }
@@ -509,7 +514,7 @@ const QUICK = [
   ['햇반', '개', '실온', '밥·면·빵'], ['쌀', '봉', '실온', '밥·면·빵'], ['식빵', '봉', '실온', '밥·면·빵'], ['통밀빵', '봉', '실온', '밥·면·빵'],
   ['두부면', '팩', '냉장', '밥·면·빵'], ['칼국수면', '봉', '냉장', '밥·면·빵'], ['라면', '개', '실온', '밥·면·빵'], ['만두', '봉', '냉동', '밥·면·빵'], ['오트밀', '봉', '실온', '밥·면·빵'],
   ['다진 고기', '팩', '냉장', '고기·생선'], ['베이컨', '팩', '냉장', '고기·생선'], ['닭', '팩', '냉장', '고기·생선'], ['어묵', '봉', '냉장', '고기·생선'], ['멸치', '봉', '냉동', '고기·생선'],
-  ['부추', '단', '냉장', '채소'], ['깻잎', '봉', '냉장', '채소'], ['숙주', '봉', '냉장', '채소'], ['청경채', '봉', '냉장', '채소'],
+  ['부추', '단', '냉장', '채소'], ['깻잎', '봉', '냉장', '채소'], ['가지', '개', '냉장', '채소'], ['고추', '봉', '냉장', '채소'], ['숙주', '봉', '냉장', '채소'], ['청경채', '봉', '냉장', '채소'],
   ['떡볶이떡', '봉', '냉장', '밥·면·빵'], ['떡국떡', '봉', '냉동', '밥·면·빵'], ['파스타면', '봉', '실온', '밥·면·빵'], ['소면', '봉', '실온', '밥·면·빵'], ['우동면', '개', '냉장', '밥·면·빵'], ['당면', '봉', '실온', '밥·면·빵'], ['또띠아', '봉', '냉동', '밥·면·빵'],
   ['김치', '통', '냉장', '기타'], ['단무지', '개', '냉장', '기타'], ['토마토소스', '병', '실온', '기타'], ['카레', '개', '실온', '기타'], ['진미채', '봉', '냉장', '기타'], ['미역', '봉', '실온', '기타'], ['참치캔', '캔', '실온', '기타'], ['견과류', '봉', '실온', '기타'], ['김', '봉', '실온', '기타'],
   ['단백질 파우더', '통', '실온', '기타'], ['들깨가루', '봉', '냉장', '기타'], ['꿀', '병', '실온', '기타'], ['주스', '개', '냉장', '기타'], ['생수', '병', '실온', '기타'],
@@ -604,4 +609,27 @@ function stockBought() {
   const list = db.shopping.filter(s => s.done && !s.stocked);
   if (!list.length) return toast('장보기 목록에서 산 것을 먼저 체크해 주세요');
   stockShopping(list);
+}
+
+// 재료 종류 (빠른 추가 분류 → 없으면 칸 규칙으로 추정): '채소' | '고기·생선' | ...
+function ingredientGroup(name) {
+  const q = quickInfo(name);
+  if (q) return q[3] === '과일' ? '과일' : q[3];
+  const z = zoneOf({ name, loc: '냉장' }), n = normName(name);
+  if (z === 'veg') return ['사과', '배', '귤', '딸기', '포도', '블루베리', '바나나', '키위', '레몬', '아보카도'].some(f => n.includes(f) && !n.includes('배추')) ? '과일' : '채소';
+  return z === 'fresh' ? '고기·생선' : '';
+}
+// 이 재료를 쓰는 레시피 (입맛으로 뺀 것 제외, 냉장고 재료로 되는 순)
+function recipesForIng(name) {
+  return RECIPES.map((r, i) => ({ r, key: 'r' + i }))
+    .filter(x => x.r.i.some(([n]) => covers(name, n)) && !recipeBlocked(x.r))
+    .map(x => ({ ...x, sc: scoreRecipe(recipeView(x.r)), any: x.r.i.some(([n]) => ANY_ING[normName(n)]) }))
+    .sort((a, b) => (a.any - b.any) || (b.sc.ratio - a.sc.ratio) || (b.r.p - a.r.p));
+}
+function recipesForIngHtml(name) {
+  const list = recipesForIng(name);
+  return `<section class="card" style="margin-bottom:10px"><div class="card-h"><h2>🍳 이 재료로 만들 요리</h2><span class="meta num">${list.length}개</span></div>
+    ${list.length ? list.slice(0, 5).map(x => `<button class="plan-slot link-row" data-x="recipe" data-key="${x.key}"><span class="ps-name">${esc(x.r.n)}${x.any ? ' <span class="r-tag">냉장고 털이</span>' : ''}<small class="num"> ${x.r.p}g · ${x.r.k}kcal${x.sc.missing.length ? ` · ${x.sc.missing.length}개 더 필요` : ' · 바로 가능'}</small></span><span class="chev">›</span></button>`).join('')
+      + (list.length > 5 ? `<button class="btn block sm" data-x="ingAll" style="margin-top:6px">전체 ${list.length}개 보기</button>` : '')
+      : '<p class="empty" style="padding:6px 0">아직 이 재료를 쓰는 레시피가 없어요</p>'}</section>`;
 }

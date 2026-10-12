@@ -13,6 +13,7 @@
   --protein: #2f6fed;
   --water: #12a4c9;
   --kitchen: #f08a00;
+  --skin: #f0527f;
   --danger: #e5352b;
   --warn: #e98a00;
   --ok: #1f9d4c;
@@ -461,3 +462,38 @@ button.photo-pick { aspect-ratio: auto; height: 96px; }
 .chip.style-like { background: color-mix(in srgb, #ff4d6d 16%, var(--card)); color: #e63958; }
 .chip.style-dislike { background: color-mix(in srgb, var(--warn) 18%, var(--card)); color: var(--warn); }
 .wish-star { margin-right: 3px; }
+
+/* ── 케어 › 피부 ── */
+.care-seg button:disabled { opacity: .45; }
+.ask-card { border: 1.5px solid color-mix(in srgb, var(--skin) 40%, transparent); }
+.today-concern { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; margin-bottom: 12px; border-radius: 12px; background: color-mix(in srgb, var(--skin) 10%, var(--card)); font-size: 14px; }
+.skin-list { list-style: none; margin: 0; padding: 0; }
+.skin-step { display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 0; border-top: .5px solid var(--line); text-align: left; }
+.skin-list li:first-child .skin-step { border-top: 0; }
+.skin-step .check.on { background: var(--skin); border-color: var(--skin); }
+.skin-step .info { flex: 1; min-width: 0; }
+.skin-step .name { display: block; font-weight: 600; }
+.skin-step.on .name { color: var(--sub); text-decoration: line-through; }
+.skin-step .sub { display: block; font-size: 12.5px; color: var(--sub); }
+.skin-step.skipped { opacity: .5; }
+.skin-step.skipped .name { text-decoration: line-through; }
+.alert-line { margin: 0 0 8px; font-size: 14px; }
+.alert-line.warn { color: var(--warn); font-weight: 600; }
+.wk-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.wk-day { display: flex; flex-direction: column; gap: 3px; padding: 6px 2px; border-radius: 10px; background: var(--card2); font-size: 10.5px; text-align: center; min-height: 64px; }
+.wk-day b { font-size: 12px; }
+.wk-day.sel { outline: 2px solid var(--skin); }
+.wk-day span { line-height: 1.25; word-break: keep-all; }
+.cos-item { width: 100%; text-align: left; }
+.cos-ic { font-size: 24px; width: 32px; text-align: center; }
+.need-badge { font-size: 12px; font-weight: 700; color: var(--warn); }
+.reco-list { display: grid; gap: 6px; }
+.reco-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--card2); color: var(--text); text-decoration: none; font-weight: 600; font-size: 14px; }
+.reco-item span { font-size: 12px; color: var(--accent); font-weight: 600; }
+.edit-step { padding: 10px 0; border-top: .5px solid var(--line); }
+.edit-step:first-of-type { border-top: 0; }
+.edit-step .input { padding: 8px 10px; }
+.edit-sub { display: grid; gap: 6px; margin-top: 6px; }
+.days { display: flex; gap: 3px; flex-wrap: wrap; }
+.dchip { padding: 4px 8px; border-radius: 8px; background: var(--fill); font-size: 12px; font-weight: 700; color: var(--sub); }
+.dchip.on { background: var(--skin); color: #fff; }

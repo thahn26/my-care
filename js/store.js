@@ -165,7 +165,7 @@ function compressImage(file, max = 1280, q = 0.82) {
 }
 
 // ── 이름 비교 (냉장고 ↔ 레시피) ──
-const SYNONYM = { 계란: '달걀', 쇠고기: '소고기', 파: '대파', 쪽파: '대파', 닭가슴: '닭가슴살', 우유저지방: '우유', 저지방우유: '우유', 무가당두유: '두유', 삶은달걀: '달걀', 흰살생선: '생선' };
+const SYNONYM = { 계란: '달걀', 쇠고기: '소고기', 파: '대파', 쪽파: '대파', 닭가슴: '닭가슴살', 우유저지방: '우유', 저지방우유: '우유', 무가당두유: '두유', 삶은달걀: '달걀', 흰살생선: '생선', 햇반: '밥', 즉석밥: '밥' };
 function normName(s) {
   let n = String(s || '').replace(/\s+/g, '').replace(/\(.*?\)/g, '');
   for (const [a, b] of Object.entries(SYNONYM)) if (n === a) return b;
@@ -182,7 +182,11 @@ function nameMatch(a, b) {
 
 // 냉장고 재료(have)가 레시피 재료(need)를 채우는지: 냉장고 쪽이 더 구체적인 것만 인정
 // (현미밥 → 밥 O, 훈제 닭가슴살 → 닭가슴살 O, 두부 → 연두부·두부면 X)
+// '자투리 채소'·'남은 고기'는 냉장고의 아무 채소·고기와 맞는 특별 재료 (냉장고 털이 레시피용)
+const ANY_ING = { 자투리채소: '채소', 남은고기: '고기·생선' };
 function covers(have, need) {
+  const any = ANY_ING[normName(need)];
+  if (any) return typeof ingredientGroup === 'function' && ingredientGroup(have) === any;
   const x = normName(have), y = normName(need);
   if (!x || !y) return false;
   if (x === y) return true;

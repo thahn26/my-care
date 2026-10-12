@@ -1,20 +1,20 @@
 // 화면 전환 · 공통 이벤트 · 설정 · 백업
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 let tab = (() => { try { return sessionStorage.getItem('tab') || 'home'; } catch (e) { return 'home'; } })();
 let cur = today();
 
-const TITLES = { home: 'MY 관리', diet: '식단', kitchen: '주방' };
+const TITLES = { home: 'MY 관리', diet: '식단', kitchen: '주방', care: '케어' };
 
 function render() {
   $('#title').textContent = TITLES[tab];
-  const dated = tab === 'home' || tab === 'diet';
+  const dated = tab === 'home' || tab === 'diet' || tab === 'care';
   $('#dateRow').hidden = !dated;
   $('#dateLabel').textContent = cur === today() ? `오늘 · ${dateLabel(cur)}` : dateLabel(cur);
   $('#todayBtn').hidden = cur === today();
   $('#nextBtn').disabled = cur >= today();
   $$('#tabbar button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
   const view = $('#view');
-  view.innerHTML = tab === 'home' ? renderHome() : tab === 'diet' ? renderDiet() : renderKitchen();
+  view.innerHTML = tab === 'home' ? renderHome() : tab === 'diet' ? renderDiet() : tab === 'care' ? renderCare() : renderKitchen();
   hydratePhotos(view);
 }
 
@@ -72,7 +72,17 @@ document.addEventListener('click', (e) => {
       db.ui.recipeTags = cur2.includes(t) ? cur2.filter(x => x !== t) : [...cur2, t];
       save(); render(); break;
     }
+    case 'skinTab': db.ui.skinTab = b.dataset.v; save(); render(); break;
+    case 'skinAskPick': { const v = b.dataset.v, l = db.ui.skinAskSel || []; db.ui.skinAskSel = l.includes(v) ? l.filter(x => x !== v) : [...l, v]; render(); break; }
+    case 'skinAskNone': skinLog(cur).concerns = ['없음']; db.ui.skinAskSel = []; save(); render(); toast('추천 루틴 그대로 갈게요'); break;
+    case 'skinAskApply': skinLog(cur).concerns = [...(db.ui.skinAskSel || [])]; db.ui.skinAskSel = []; save(); render(); toast('오늘 고민에 맞게 루틴을 바꿨어요'); break;
+    case 'skinAskReset': db.ui.skinAskSel = [...(skinLog(cur).concerns || [])]; skinLog(cur).concerns = null; save(); render(); break;
+    case 'skinCheck': { const c = skinLog(cur).checks; c[b.dataset.id] ? delete c[b.dataset.id] : (c[b.dataset.id] = true); save(); render(); break; }
+    case 'skinEdit': openSkinEdit(); break;
+    case 'cosEdit': openCosmetic(b.dataset.id); break;
+    case 'cosShowDone': db.ui.cosShowDone = !db.ui.cosShowDone; save(); render(); break;
     case 'toggleHidden': db.ui.showHidden = !db.ui.showHidden; save(); render(); break;
+    case 'recipeIngClear': db.ui.recipeIng = ''; save(); render(); break;
     case 'recipeTagClear': db.ui.recipeTags = []; save(); render(); break;
     case 'recipe': openRecipe(b.dataset.key); break;
     case 'aiRecipes': openAiRecipeAsk(); break;
@@ -228,7 +238,8 @@ setInterval(() => { if (today() !== lastDay) { if (cur === lastDay) cur = today(
 
 if (tab === 'kitchen' && (db.ui.kitchenTab || 'fridge') === 'fridge') fridgeAnim = true;
 render();
-if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+// 오프라인 지원 (개발용 localhost에서는 옛 파일이 남지 않게 끔)
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 
 function tasteSummary() {

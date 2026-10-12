@@ -204,6 +204,7 @@ function planShopping(plan) {
   }
   const out = [];
   for (const e of need.values()) {
+    if (ANY_ING[normName(e.name)]) continue; // 냉장고 털이 재료는 사지 않음
     if (normName(e.name) === '밥' && db.fridge.some(x => normName(x.name).includes('쌀'))) continue;
     const f = fridgeHas(e.name);
     if (f) {
