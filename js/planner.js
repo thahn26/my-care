@@ -79,14 +79,24 @@ function consumeStock(r, stock) {
 
 // slots: [{ day, meal }] → 각 칸에 레시피 키('r'+번호), 사야 할 재료 수, 바꿀 후보 목록
 // 1순위: 냉장고 재료로 다 되는 메뉴 → 거의 되는 메뉴. 고른 태그는 그다음으로 반영
-function buildPlan(slots, seed, wantTags = []) {
+function buildPlan(slots, seed, wantTags = [], wishes = []) {
   const rand = seededRandom(seed);
   const stock = planStock();
   const used = {}, mains = {}, byDay = {};
-  return slots.map(s => {
+  // 먹고 싶다고 한 메뉴는 맞는 끼니에 먼저 자리를 잡는다
+  const fixed = {};
+  for (const w of wishes.filter(w => w.type === 'recipe')) {
+    const ri = RECIPES.findIndex(r => r.n === w.name);
+    if (ri < 0) continue;
+    let si = slots.findIndex((s, i) => fixed[i] == null && slotFits(RECIPES[ri], s.meal, s.day));
+    if (si < 0) si = slots.findIndex((s, i) => fixed[i] == null);
+    if (si >= 0) fixed[si] = 'r' + ri;
+  }
+  const wishIngs = wishes.filter(w => w.type === 'ing').map(w => ({ name: w.name, done: false }));
+  return slots.map((s, si) => {
     const dayIdx = diffDays(s.day, today());
     const scored = RECIPES.map((r, i) => ({ r, key: 'r' + i }))
-      .filter(c => slotFits(c.r, s.meal, s.day))
+      .filter(c => fixed[si] ? c.key === fixed[si] : slotFits(c.r, s.meal, s.day) && !recipeBlocked(c.r))
       .map(c => {
         const cov = coverage(c.r, stock);
         let score = cov.ratio * 40 + (cov.have === cov.total ? 25 : 0) + rand() * 4 + c.r.p / 8;
@@ -95,10 +105,12 @@ function buildPlan(slots, seed, wantTags = []) {
           const labels = recipeTags(c.r), hit = wantTags.filter(t => labels.includes(t)).length;
           score += hit === wantTags.length ? 18 : hit * 6;
         }
+        score += Math.min(recipeLikeScore(c.r), 4) * 5;                   // 좋아하는 메뉴·재료·맛
+        for (const w of wishIngs) if (!w.done && recipeHasIng(c.r, w.name)) score += 30; // 먹고 싶은 재료
         const u = used[c.key] || 0;
         score -= u >= 2 ? 100 : u * 8;                                   // 한 주에 같은 메뉴 최대 2번
         if ((byDay[s.day] || []).includes(c.key)) score -= 100;
-        if ((byDay[addDays(s.day, -1)] || []).includes(c.key)) score -= 12; // 연달아 같은 메뉴 X
+        if ((byDay[addDays(s.day, -1)] || []).includes(c.key) || (byDay[addDays(s.day, -2)] || []).includes(c.key)) score -= 45; // 이틀 안에 같은 메뉴 X
         const mc = mains[mainIngredient(c.r)] || 0;
         score -= mc >= 3 ? 40 : mc * 4;                                  // 같은 단백질은 한 주에 3번까지
         return { ...c, cov, score };
@@ -107,10 +119,12 @@ function buildPlan(slots, seed, wantTags = []) {
     const pick = scored[0];
     if (!pick) return { ...s, key: null, alts: [], missing: 0 };
     consumeStock(pick.r, stock);
+    for (const w of wishIngs) if (recipeHasIng(pick.r, w.name)) w.done = true;
     used[pick.key] = (used[pick.key] || 0) + 1;
     mains[mainIngredient(pick.r)] = (mains[mainIngredient(pick.r)] || 0) + 1;
     (byDay[s.day] ||= []).push(pick.key);
-    return { ...s, key: pick.key, missing: pick.cov.total - pick.cov.have, alts: scored.slice(0, 12).map(x => x.key) };
+    const alts = fixed[si] ? [pick.key, ...RECIPES.map((r, i) => ({ r, key: 'r' + i })).filter(c => c.key !== pick.key && slotFits(c.r, s.meal, s.day) && !recipeBlocked(c.r)).slice(0, 11).map(c => c.key)] : scored.slice(0, 12).map(x => x.key);
+    return { ...s, key: pick.key, wished: !!fixed[si], missing: pick.cov.total - pick.cov.have, alts };
   });
 }
 
@@ -211,6 +225,7 @@ function openPlanner() {
   for (const d of days) for (const m of PLAN_MEALS) if (pat[parse(d).getDay()][m]) sel[`${d}|${m}`] = true;
   let seed = Date.now() % 100000, plan = null, shop = [];
   let want = [...(db.settings.planTags || [])];
+  let wishes = [], wishQ = ''; // [{ type: 'recipe'|'ing', name }]
   const panel = openSheet('');
 
   const count = () => Object.values(sel).filter(Boolean).length;
@@ -228,12 +243,33 @@ function openPlanner() {
         </div>
       </section>
       <section class="card">
+        <div class="card-h" style="margin-bottom:6px"><h2>😋 이번 주에 먹고 싶은 거 있어요?</h2><span class="meta">선택</span></div>
+        <p class="small muted" style="margin:0 0 10px">메뉴를 고르면 식단에 꼭 넣고, 재료를 적으면 그 재료로 만드는 메뉴를 넣어요.</p>
+        ${wishes.length ? `<div class="chips" style="margin-bottom:10px">${wishes.map((w, i) => `<span class="taste-chip wish">${w.type === 'ing' ? '🥕 ' : '🍽 '}${esc(w.name)}<button data-x="unwish" data-i="${i}" aria-label="${esc(w.name)} 빼기">×</button></span>`).join('')}</div>` : ''}
+        <input id="wishInput" class="input" placeholder="예: 떡볶이, 카레, 연어" value="${esc(wishQ)}" autocomplete="off">
+        <div id="wishSuggest">${wishSuggestHtml()}</div>
+      </section>
+      <section class="card">
         <div class="card-h" style="margin-bottom:6px"><h2>먹고 싶은 스타일</h2><span class="meta">선택</span></div>
         <p class="small muted" style="margin:0 0 10px">냉장고 재료로 되는 메뉴가 1순위이고, 고른 태그는 그다음으로 반영해요. 안 고르면 전체에서 골라요.</p>
         <div class="chips">${PLAN_TAGS.map(t => `<button class="chip ${want.includes(t) ? 'on' : ''}" data-x="want" data-v="${t}">${t}</button>`).join('')}</div>
       </section>
       <button class="btn primary block" data-x="build" ${count() ? '' : 'disabled'}>식단 짜기 (${count()}끼)</button>`;
   };
+
+  function wishSuggestHtml() {
+    const q = wishQ.replace(/\s+/g, '');
+    if (!q) return '';
+    // 직접 고른 메뉴는 싫어요여도 넣어 주되, 못 먹는 것(알레르기)은 끝까지 막는다
+    const hits = RECIPES.filter(r => r.n.replace(/\s+/g, '').includes(q) && !String(recipeBlocked(r) || '').startsWith('못 먹는') && !wishes.some(w => w.name === r.n)).slice(0, 5);
+    return `<div class="suggest">${hits.map(r => `<button data-x="wish" data-t="recipe" data-n="${esc(r.n)}"><span>🍽 ${esc(r.n)}</span><small class="num">${r.p}g · ${r.k}kcal</small></button>`).join('')}
+      <button data-x="wish" data-t="ing" data-n="${esc(wishQ.trim())}"><span>🥕 '${esc(wishQ.trim())}' 들어간 메뉴 넣기</span><small>재료</small></button></div>`;
+  }
+  panel.addEventListener('input', (e) => {
+    if (e.target.id !== 'wishInput') return;
+    wishQ = e.target.value;
+    panel.querySelector('#wishSuggest').innerHTML = wishSuggestHtml();
+  });
 
   const drawResult = () => {
     const g = goals();
@@ -247,7 +283,7 @@ function openPlanner() {
           const p = slots.reduce((a, s) => a + (s.key ? RECIPES[+s.key.slice(1)].p : 0), 0);
           return `<div class="plan-day"><div class="row-between"><b>${shortDate(d)}</b><span class="small muted num">단백질 ${n0(p)}g${slots.length === 3 ? ` / ${g.protein}g` : ''}</span></div>
             ${slots.map(s => { const r = s.key && RECIPES[+s.key.slice(1)]; return `<div class="plan-slot"><span class="ps-meal">${PLAN_ICON[s.meal]} ${s.meal}</span>
-              <span class="ps-name">${r ? esc(r.n) : '맞는 메뉴 없음'}<small class="num">${r ? ` ${r.p}g · ${r.k}kcal` : ''}</small>${r ? (s.missing ? `<span class="ps-badge need">+${s.missing}개 사야 해요</span>` : '<span class="ps-badge ok">냉장고 재료로 OK</span>') : ''}</span>
+              <span class="ps-name">${s.wished ? '<span class="wish-star">⭐</span>' : ''}${r ? esc(r.n) : '맞는 메뉴 없음'}<small class="num">${r ? ` ${r.p}g · ${r.k}kcal` : ''}</small>${r ? (s.missing ? `<span class="ps-badge need">+${s.missing}개 사야 해요</span>` : '<span class="ps-badge ok">냉장고 재료로 OK</span>') : ''}</span>
               <button class="btn sm" data-x="swap" data-k="${s.day}|${s.meal}">바꾸기</button></div>`; }).join('')}</div>`;
         }).join('')}
         <button class="btn block sm" data-x="reroll" style="margin-top:6px">🔀 전부 다시 짜기</button>
@@ -264,7 +300,7 @@ function openPlanner() {
   const build = () => {
     const slots = [];
     for (const d of days) for (const m of PLAN_MEALS) if (sel[`${d}|${m}`]) slots.push({ day: d, meal: m });
-    plan = buildPlan(slots, seed, want);
+    plan = buildPlan(slots, seed, want, wishes);
     shop = planShopping(plan);
     drawResult();
   };
@@ -275,6 +311,11 @@ function openPlanner() {
     const x = b.dataset.x;
     if (x === 'close') return closeSheet();
     if (x === 'cell') { sel[b.dataset.k] = !sel[b.dataset.k]; drawPick(); }
+    else if (x === 'wish') {
+      wishes.push({ type: b.dataset.t, name: b.dataset.n });
+      wishQ = ''; drawPick();
+    }
+    else if (x === 'unwish') { wishes.splice(+b.dataset.i, 1); drawPick(); }
     else if (x === 'want') { const t = b.dataset.v; want = want.includes(t) ? want.filter(v => v !== t) : [...want, t]; drawPick(); }
     else if (x === 'preset') {
       for (const d of days) for (const m of PLAN_MEALS) {

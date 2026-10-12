@@ -225,7 +225,7 @@ async function thrownAway(item) {
 function recipeView(r, ai = false) {
   // 내장 레시피와 AI 레시피를 같은 모양으로
   if (ai) return { name: r.name, k: r.kcal, p: r.protein, t: r.minutes, tags: r.lunchTip ? ['도시락'] : [], labels: recipeTags({ k: r.kcal, p: r.protein, t: r.minutes, d: r.lunchTip, tag: [] }), ing: r.ingredients.map(i => [i.name, i.amount]), s: r.seasoning, st: r.steps, tip: r.lunchTip, why: r.why, ai: true };
-  return { name: r.n, k: r.k, p: r.p, t: r.t, tags: r.tag, labels: recipeTags(r), ing: r.i, s: r.s, st: r.st, tip: r.d || '', why: '', ai: false };
+  return { name: r.n, k: r.k, p: r.p, t: r.t, tags: r.tag, labels: recipeTags(r), ing: r.i, s: r.s, st: r.st, tip: r.d || '', why: '', ai: false, raw: r };
 }
 // 유통기한이 지난 재료는 '있는 재료'로 치지 않는다
 function fridgeHas(name) { return db.fridge.find(f => covers(f.name, name) && !(f.exp && f.exp < today())); }
@@ -238,7 +238,7 @@ function scoreRecipe(v) {
 function recipeRow(v, key) {
   const sc = scoreRecipe(v);
   return `<button class="recipe" data-action="recipe" data-key="${key}">
-    <div class="name">${v.ai ? '✨ ' : ''}${esc(v.name)}</div>
+    <div class="name">${v.ai ? '✨ ' : ''}${esc(v.name)}${v.raw && taste().likeRecipes.includes(v.raw.n) ? ' <span class="liked">♥</span>' : ''}</div>
     <div class="facts num"><span><b>${n0(v.k)}</b>kcal</span><span>단백질 <b>${n1(v.p)}</b>g</span><span>${v.t}분</span>${sc.urgent ? '<span style="color:var(--danger);font-weight:700">임박 재료 사용</span>' : ''}</div>
     <div class="r-tags">${(v.labels || []).filter(t => !['10분'].includes(t)).slice(0, 5).map(t => `<span class="r-tag ${t === '매콤한' ? 'hot' : t === '속편한' ? 'calm' : ''}">${t}</span>`).join('')}</div>
     ${db.fridge.length ? `<div class="have"><span class="muted">재료 ${sc.have}/${sc.total}</span><div class="bar"><i style="width:${sc.ratio * 100}%"></i></div></div>
@@ -250,9 +250,11 @@ function renderRecipes() {
   let list = RECIPES.map((r, i) => ({ v: recipeView(r), key: 'r' + i }));
   for (const t of sel) list = t === '바로 가능' ? list.filter(x => scoreRecipe(x.v).ratio === 1) : list.filter(x => x.v.labels.includes(t));
   // 냉장고 재료를 많이 쓰는 순 → 유통기한 임박 → 단백질
+  const hidden = list.filter(x => recipeBlocked(x.v.raw));
+  list = list.filter(x => !recipeBlocked(x.v.raw));
   list.sort((a, b) => {
     const sa = scoreRecipe(a.v), sb = scoreRecipe(b.v);
-    return (sb.ratio - sa.ratio) || (sb.have - sa.have) || (sb.urgent - sa.urgent) || (b.v.p - a.v.p);
+    return (sb.ratio - sa.ratio) || (recipeLikeScore(b.v.raw) - recipeLikeScore(a.v.raw)) || (sb.have - sa.have) || (sb.urgent - sa.urgent) || (b.v.p - a.v.p);
   });
   const ai = db.aiRecipes || [];
   return `
@@ -264,6 +266,8 @@ function renderRecipes() {
   <div class="row-between" style="margin:2px 4px 10px"><span class="small muted num">${sel.length ? `${sel.join(' + ')} · ` : ''}${list.length}개</span>${sel.length ? '<button class="link small" data-action="recipeTagClear">태그 지우기</button>' : ''}</div>
   ${!db.fridge.length ? '<p class="small muted" style="margin:0 4px 10px">냉장고에 재료를 넣으면 있는 재료가 많은 요리부터 보여 드려요.</p>' : ''}
   <section class="card">${list.length ? list.map(x => recipeRow(x.v, x.key)).join('') : '<p class="empty">조건에 맞는 레시피가 없어요</p>'}</section>
+  ${hidden.length ? `<button class="link small" data-action="toggleHidden" style="display:block;margin:0 4px 10px">${db.ui.showHidden ? '▾' : '▸'} 내 입맛 때문에 뺀 레시피 ${hidden.length}개</button>
+  ${db.ui.showHidden ? `<section class="card faded">${hidden.map(x => recipeRow(x.v, x.key)).join('')}</section>` : ''}` : ''}
   <p class="small muted" style="margin:0 4px">모든 레시피는 속 편한 고단백 다이어트식이에요. 숟 = 밥숟가락, 컵 = 종이컵(약 180ml).</p>`;
 }
 function recipeByKey(key) {
@@ -279,6 +283,7 @@ function openRecipe(key, meal) {
     <section class="card">
       <div class="facts num" style="display:flex;gap:14px;font-size:15px"><span><b>${n0(v.k)}</b>kcal</span><span>단백질 <b>${n1(v.p)}</b>g</span><span>${v.t}분</span></div>
       ${v.why ? `<p class="small muted" style="margin:8px 0 0">${esc(v.why)}</p>` : ''}
+      ${tasteRow(v)}
     </section>
     <section class="card"><div class="card-h"><h2>재료</h2><span class="meta">${db.fridge.length ? `냉장고에 ${sc.have}/${sc.total}` : ''}</span></div>
       <ul class="ing-list">${v.ing.map(([n, a]) => { const has = fridgeHas(n); return `<li><span>${db.fridge.length ? (has ? '<span class="ok">✓</span> ' : '<span class="no">✗</span> ') : ''}${esc(n)}</span><span class="muted">${esc(a)}</span></li>`; }).join('')}</ul>
@@ -294,6 +299,18 @@ function openRecipe(key, meal) {
     const b = e.target.closest('[data-x]');
     if (!b) return;
     if (b.dataset.x === 'close') return closeSheet();
+    if (b.dataset.x === 'like' || b.dataset.x === 'dislike') {
+      const t = taste(), n = v.raw.n;
+      if (b.dataset.x === 'like') { toggleIn(t.likeRecipes, n); t.dislikeRecipes = t.dislikeRecipes.filter(x => x !== n); }
+      else { toggleIn(t.dislikeRecipes, n); t.likeRecipes = t.likeRecipes.filter(x => x !== n); }
+      save(); render();
+      const liked = t.likeRecipes.includes(n), disliked = t.dislikeRecipes.includes(n);
+      const card = panel.querySelector('.taste-row').parentElement;
+      card.querySelectorAll('.taste-row, .taste-row + p').forEach(el => el.remove());
+      card.insertAdjacentHTML('beforeend', tasteRow(v));
+      toast(liked ? '좋아요 한 메뉴로 저장했어요' : disliked ? '싫어요 — 추천·식단에서 뺄게요' : '보통으로 되돌렸어요');
+      return;
+    }
     if (b.dataset.x === 'shop') {
       const added = sc.missing.filter(n => addShopping(n, `레시피: ${v.name}`)).length;
       save(); closeSheet(); render();

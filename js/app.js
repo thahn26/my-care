@@ -1,5 +1,5 @@
 // 화면 전환 · 공통 이벤트 · 설정 · 백업
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 let tab = (() => { try { return sessionStorage.getItem('tab') || 'home'; } catch (e) { return 'home'; } })();
 let cur = today();
 
@@ -72,6 +72,7 @@ document.addEventListener('click', (e) => {
       db.ui.recipeTags = cur2.includes(t) ? cur2.filter(x => x !== t) : [...cur2, t];
       save(); render(); break;
     }
+    case 'toggleHidden': db.ui.showHidden = !db.ui.showHidden; save(); render(); break;
     case 'recipeTagClear': db.ui.recipeTags = []; save(); render(); break;
     case 'recipe': openRecipe(b.dataset.key); break;
     case 'aiRecipes': openAiRecipeAsk(); break;
@@ -142,6 +143,9 @@ function openSettings() {
         <div class="row-between small"><span>이번 달 사용</span><b class="num">${u.calls}회 · 약 $${u.cost.toFixed(2)}</b></div>
       </section>
 
+      <div class="section-title">내 입맛</div>
+      <section class="card"><button class="setup-cta" data-x="taste"><span class="ic">😋</span><span><b>좋아하는 것 · 싫어하는 것 · 못 먹는 것</b><br><span class="small muted">${tasteSummary()}</span></span></button></section>
+
       <div class="section-title">데이터</div>
       <section class="card">
         <p class="small muted" style="margin:0 0 10px">기록은 이 기기에만 저장돼요. 폰을 바꾸거나 앱을 지우기 전에 백업해 두세요.</p>
@@ -167,6 +171,7 @@ function openSettings() {
     if (x === 'sex') { p.sex = b.dataset.v; save(); draw(); }
     else if (x === 'goal') { p.goal = b.dataset.v; save(); draw(); }
     else if (x === 'water') { s.waterGoal = Math.max(1, Math.min(20, s.waterGoal + +b.dataset.d)); save(); draw(); }
+    else if (x === 'taste') { closeSheet(); setTimeout(openTaste, 320); }
     else if (x === 'export') exportBackup();
     else if (x === 'import') importBackup();
     else if (x === 'reset') {
@@ -225,3 +230,11 @@ if (tab === 'kitchen' && (db.ui.kitchenTab || 'fridge') === 'fridge') fridgeAnim
 render();
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+
+function tasteSummary() {
+  const t = taste(), parts = [];
+  if (t.allergies.length) parts.push(`못 먹는 것 ${t.allergies.length}`);
+  if (t.dislikeIngs.length + t.dislikeRecipes.length + t.dislikeStyles.length) parts.push(`싫어요 ${t.dislikeIngs.length + t.dislikeRecipes.length + t.dislikeStyles.length}`);
+  if (t.likeIngs.length + t.likeRecipes.length + t.likeStyles.length) parts.push(`좋아요 ${t.likeIngs.length + t.likeRecipes.length + t.likeStyles.length}`);
+  return parts.length ? parts.join(' · ') : '아직 없어요. 저장하면 추천과 식단에 반영돼요.';
+}
