@@ -70,8 +70,8 @@ function renderHome() {
   </section>
 
   ${renderTodayPlan(cur)}
-  ${(() => { const pg = skinProgress(cur), all = pg.am.done + pg.pm.done, tot = pg.am.total + pg.pm.total;
-    return `<section class="card"><button class="setup-cta" data-action="tab" data-tab="care"><span class="ic">🧴</span><span style="flex:1"><b>오늘의 피부 루틴</b><br><span class="small muted num">아침 ${pg.am.done}/${pg.am.total} · 저녁 ${pg.pm.done}/${pg.pm.total}${skinLog(cur).concerns == null && cur === today() ? ' · 오늘 피부 고민 체크 전' : ''}</span></span><span class="num" style="font-weight:800;color:${all >= tot && tot ? 'var(--ok)' : 'var(--sub)'}">${tot ? Math.round(all / tot * 100) : 0}%</span></button></section>`; })()}
+  ${(() => { const pg = skinProgress(cur), all = pg.am.done + pg.noon.done + pg.pm.done, tot = pg.am.total + pg.noon.total + pg.pm.total;
+    return `<section class="card"><button class="setup-cta" data-action="tab" data-tab="care"><span class="ic">🧴</span><span style="flex:1"><b>오늘의 피부 루틴</b><br><span class="small muted num">아침 ${pg.am.done}/${pg.am.total} · 점심 ${pg.noon.done}/${pg.noon.total} · 저녁 ${pg.pm.done}/${pg.pm.total}${skinLog(cur).concerns == null && cur === today() ? ' · 오늘 피부 고민 체크 전' : ''}</span></span><span class="num" style="font-weight:800;color:${all >= tot && tot ? 'var(--ok)' : 'var(--sub)'}">${tot ? Math.round(all / tot * 100) : 0}%</span></button></section>`; })()}
 
   ${soon.length ? `<section class="card">
     <div class="card-h"><h2>유통기한 임박</h2><button class="link small" data-action="kitchen" data-sub="fridge">냉장고 ›</button></div>

@@ -1,5 +1,5 @@
 // 화면 전환 · 공통 이벤트 · 설정 · 백업
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.5.0';
 let tab = (() => { try { return sessionStorage.getItem('tab') || 'home'; } catch (e) { return 'home'; } })();
 let cur = today();
 
@@ -72,15 +72,6 @@ document.addEventListener('click', (e) => {
       db.ui.recipeTags = cur2.includes(t) ? cur2.filter(x => x !== t) : [...cur2, t];
       save(); render(); break;
     }
-    case 'skinTab': db.ui.skinTab = b.dataset.v; save(); render(); break;
-    case 'skinAskPick': { const v = b.dataset.v, l = db.ui.skinAskSel || []; db.ui.skinAskSel = l.includes(v) ? l.filter(x => x !== v) : [...l, v]; render(); break; }
-    case 'skinAskNone': skinLog(cur).concerns = ['없음']; db.ui.skinAskSel = []; save(); render(); toast('추천 루틴 그대로 갈게요'); break;
-    case 'skinAskApply': skinLog(cur).concerns = [...(db.ui.skinAskSel || [])]; db.ui.skinAskSel = []; save(); render(); toast('오늘 고민에 맞게 루틴을 바꿨어요'); break;
-    case 'skinAskReset': db.ui.skinAskSel = [...(skinLog(cur).concerns || [])]; skinLog(cur).concerns = null; save(); render(); break;
-    case 'skinCheck': { const c = skinLog(cur).checks; c[b.dataset.id] ? delete c[b.dataset.id] : (c[b.dataset.id] = true); save(); render(); break; }
-    case 'skinEdit': openSkinEdit(); break;
-    case 'cosEdit': openCosmetic(b.dataset.id); break;
-    case 'cosShowDone': db.ui.cosShowDone = !db.ui.cosShowDone; save(); render(); break;
     case 'toggleHidden': db.ui.showHidden = !db.ui.showHidden; save(); render(); break;
     case 'recipeIngClear': db.ui.recipeIng = ''; save(); render(); break;
     case 'recipeTagClear': db.ui.recipeTags = []; save(); render(); break;
@@ -91,6 +82,7 @@ document.addEventListener('click', (e) => {
     case 'shopDel': db.shopping = db.shopping.filter(s => s.id !== b.dataset.id); save(); render(); break;
     case 'shopClear': db.shopping = db.shopping.filter(s => !s.done); save(); render(); break;
     case 'aiShopping': aiShopping(); break;
+    default: skinAction(a, b);
   }
 });
 

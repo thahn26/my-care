@@ -497,3 +497,86 @@ button.photo-pick { aspect-ratio: auto; height: 96px; }
 .days { display: flex; gap: 3px; flex-wrap: wrap; }
 .dchip { padding: 4px 8px; border-radius: 8px; background: var(--fill); font-size: 12px; font-weight: 700; color: var(--sub); }
 .dchip.on { background: var(--skin); color: #fff; }
+
+/* ── 케어 › 내 루틴 ── */
+.skin-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 12px; }
+.skin-days button { position: relative; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 7px 0; border-radius: 12px; background: var(--card); font-size: 12px; color: var(--sub); }
+.skin-days button b { font-size: 12px; }
+.skin-days button .num { font-size: 15px; font-weight: 700; color: var(--text); }
+.skin-days button.today .num { color: var(--skin); }
+.skin-days button.on { background: var(--skin); color: #fff; }
+.skin-days button.on .num { color: #fff; }
+.pico-dot { position: absolute; top: 4px; right: 6px; width: 6px; height: 6px; border-radius: 50%; background: #8a5cf6; }
+.pico-card { border: 1.5px solid color-mix(in srgb, #8a5cf6 45%, transparent); }
+.skin-step { align-items: flex-start; }
+.skin-step .check { margin-top: 2px; }
+.st-no { display: inline-block; min-width: 18px; margin-right: 2px; color: var(--skin); font-weight: 800; }
+.st-prod { display: flex; align-items: center; gap: 5px; margin-top: 2px; font-size: 13px; color: var(--text); }
+.st-prod .need { color: var(--warn); font-size: 12.5px; font-weight: 600; }
+.ca.mini { width: 20px; height: 20px; flex: none; }
+.st-how { display: block; margin-top: 3px; font-size: 12.5px; line-height: 1.45; color: var(--sub); }
+.skin-step.on .st-how, .skin-step.on .st-prod { display: none; }
+.skin-step:disabled:not(.skipped) { opacity: 1; }
+button.wk-day { color: var(--text); }
+.wk-day .pico { color: #8a5cf6; font-weight: 800; }
+.plain-list { list-style: none; margin: 0 0 10px; padding: 0; }
+.plain-list li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: .5px solid var(--line); font-size: 14px; }
+.plain-list li:first-child { border-top: 0; }
+.plain-list li span:first-child { flex: 1; }
+.when-badge { font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 8px; background: var(--fill); color: var(--sub); white-space: nowrap; }
+.when-badge.now { background: color-mix(in srgb, var(--skin) 15%, transparent); color: var(--skin); }
+.skin-btn { background: var(--skin); color: #fff; }
+.chev { color: var(--muted); }
+.dev-hero { display: grid; place-items: center; margin: 0 0 10px; }
+.dev-hero .ca { width: 76px; height: 76px; }
+.how-list { margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.55; }
+.how-list.dont li::marker { color: var(--danger); }
+
+/* 화장품 그림 색 */
+.ca .b { fill: var(--c); stroke: color-mix(in srgb, var(--c) 55%, #3b3b3b); }
+.ca .k { fill: var(--k); stroke: color-mix(in srgb, var(--c) 55%, #3b3b3b); }
+.ca .l { fill: rgba(255, 255, 255, .82); stroke: none; }
+.ca .h { fill: rgba(255, 255, 255, .55); stroke: none; }
+.ca .d { fill: color-mix(in srgb, var(--c) 40%, #2a2a2a); stroke: color-mix(in srgb, var(--c) 40%, #2a2a2a); }
+.fi-art .ca { width: 100%; height: 100%; overflow: visible; }
+
+/* ── 화장대 그림 ── */
+:root {
+  --vn-wood: #f7cfd9; --vn-edge: #e8a6b8; --vn-in: #fff8fa; --vn-glass1: #f3f9fd; --vn-glass2: #dcecf6;
+  --vn-frame: #f2d79e; --vn-frame-edge: #d9b56c; --vn-bulb: #fff3c4;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --vn-wood: #5b3c47; --vn-edge: #7a5361; --vn-in: #26222a; --vn-glass1: #1f2830; --vn-glass2: #26333e;
+    --vn-frame: #7d6a42; --vn-frame-edge: #98824f; --vn-bulb: #c9b97a;
+  }
+}
+.vanity { padding: 4px 2px 0; }
+.vn-mirror { margin: 0 22px; padding: 8px 8px 0; border-radius: 120px 120px 10px 10px; background: var(--vn-frame); border: 3px solid var(--vn-frame-edge); border-bottom: 0; }
+.vn-glass { position: relative; display: flex; flex-direction: column; justify-content: flex-end; min-height: 150px; padding: 40px 6px 4px; border-radius: 110px 110px 6px 6px; background: linear-gradient(160deg, var(--vn-glass1), var(--vn-glass2)); overflow: hidden; }
+.vn-shine { position: absolute; top: 18px; left: 22%; width: 18px; height: 90px; border-radius: 10px; background: rgba(255, 255, 255, .55); transform: rotate(24deg); pointer-events: none; }
+.vn-bulbs { position: absolute; top: 8px; left: 0; right: 0; display: flex; justify-content: center; gap: 16px; pointer-events: none; }
+.vn-bulbs i { width: 11px; height: 11px; border-radius: 50%; background: var(--vn-bulb); box-shadow: 0 0 10px 4px rgba(255, 230, 150, .55); }
+.vn-bulbs i:nth-child(1), .vn-bulbs i:nth-child(5) { margin-top: 14px; }
+.vn-bulbs i:nth-child(3) { margin-top: -3px; }
+.vn-glass .shelf-items { position: relative; justify-content: center; }
+.vn-ledge, .vn-plank { font-size: 10px; font-weight: 700; color: var(--sub); text-align: center; }
+.vn-ledge { margin: 0 -11px; padding: 3px 0; border-radius: 4px; background: var(--vn-frame); border: 3px solid var(--vn-frame-edge); }
+.vn-desk { margin-top: 0; }
+.vn-top { padding: 8px 6px 0; }
+.vn-top .shelf-items { justify-content: center; min-height: 56px; }
+.vn-plank { padding: 4px 0; border-radius: 8px 8px 2px 2px; background: var(--vn-wood); border: 3px solid var(--vn-edge); }
+.vn-cab { display: grid; gap: 6px; padding: 8px; background: var(--vn-wood); border: 3px solid var(--vn-edge); border-top: 0; border-radius: 0 0 14px 14px; }
+.drawer { border-radius: 10px; overflow: hidden; border: 2px solid var(--vn-edge); }
+.dr-in { padding: 6px 4px 2px; background: var(--vn-in); box-shadow: inset 0 3px 6px rgba(0, 0, 0, .06); }
+.dr-in .shelf-items { min-height: 52px; }
+.dr-front { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 5px 0; background: var(--vn-wood); border-top: 2px solid var(--vn-edge); font-size: 11px; font-weight: 700; color: var(--sub); }
+.knob { width: 22px; height: 6px; border-radius: 6px; background: var(--vn-frame-edge); }
+.vn-feet { display: flex; justify-content: space-between; padding: 0 30px; }
+.vn-feet i { width: 10px; height: 16px; border-radius: 0 0 5px 5px; background: var(--vn-edge); }
+.pantry.bath { margin-top: 18px; }
+.fi.ci .fi-badge.new { background: var(--ok); }
+.fi.ci .fi-badge.rest { background: var(--fill); color: var(--sub); }
+.ci-today { position: absolute; top: 2px; left: 4px; width: 8px; height: 8px; border-radius: 50%; background: var(--skin); box-shadow: 0 0 0 2px var(--card); }
+.ci-today.inline { position: static; display: inline-block; vertical-align: middle; margin-right: 2px; }
+.cos-item .name, .cos-item .sub { display: block; }
