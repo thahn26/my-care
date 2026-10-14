@@ -1,5 +1,5 @@
 // 화면 전환 · 공통 이벤트 · 설정 · 백업
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.6.1';
 let tab = (() => { try { return sessionStorage.getItem('tab') || 'home'; } catch (e) { return 'home'; } })();
 let cur = today();
 

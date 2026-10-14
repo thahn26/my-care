@@ -606,3 +606,6 @@ button.wk-day { color: var(--text); }
 .wt-dot { fill: var(--kcal); }
 .wt-lbl { font-size: 10px; fill: var(--sub); }
 .pg.shake { background: #7b61ff; font-size: 18px; }
+.fu-chip { padding: 4px 10px; border-radius: 999px; background: var(--fill); color: var(--sub); font-size: 13px; font-weight: 600; }
+.fu-chip.used { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); }
+.fu-chip.none { background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); }

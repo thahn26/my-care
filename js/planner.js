@@ -62,13 +62,15 @@ function stockUse(stock, name, amount) {
 }
 function coverage(r, stock) {
   let have = 0, urgent = false;
+  const items = [];
   for (const [n, a] of r.i) {
     const u = stockUse(stock, n, a);
     if (!u) continue;
     have++;
+    items.push(u.st);
     if (u.st.exp && diffDays(u.st.exp, today()) <= 3) urgent = true;
   }
-  return { have, total: r.i.length, ratio: r.i.length ? have / r.i.length : 0, urgent };
+  return { have, total: r.i.length, ratio: r.i.length ? have / r.i.length : 0, urgent, items };
 }
 function consumeStock(r, stock) {
   for (const [n, a] of r.i) {
@@ -97,19 +99,22 @@ function buildPlan(slots, seed, wantTags = [], wishes = []) {
     if (si >= 0) fixed[si] = 'r' + ri;
   }
   const wishIngs = wishes.filter(w => w.type === 'ing').map(w => ({ name: w.name, done: false }));
+  const touched = new Set(); // 이번 식단에 이미 한 번 쓴 냉장고 재료
   return slots.map((s, si) => {
     const dayIdx = diffDays(s.day, today());
     const scored = RECIPES.map((r, i) => ({ r, key: 'r' + i }))
       .filter(c => fixed[si] ? c.key === fixed[si] : slotFits(c.r, s.meal, s.day) && !recipeBlocked(c.r))
       .map(c => {
         const cov = coverage(c.r, stock);
-        let score = cov.ratio * 30 + cov.have * 9 + (cov.have === cov.total ? 15 : 0) + rand() * 4 + c.r.p / 8; // 냉장고 재료를 많이 쓰는 메뉴 우선
-        if (cov.urgent) score += Math.max(0, 12 - dayIdx * 3);          // 임박 재료는 앞쪽 날에
-        if (wantTags.length) {
+        // 냉장고가 1순위: 있는 재료를 많이 쓰고, 아직 안 쓴 재료를 쓰고, 사야 할 게 적은 메뉴
+        const missing = cov.total - cov.have, fresh = cov.items.filter(st => !touched.has(st)).length;
+        let score = cov.have * 10 + fresh * 18 - missing * 12 + (missing === 0 ? 15 : 0) + rand() * 4 + c.r.p / 10;
+        if (cov.urgent) score += Math.max(0, 20 - dayIdx * 4);          // 임박 재료는 앞쪽 날에
+        if (wantTags.length) {                                          // 고른 스타일은 그다음
           const labels = recipeTags(c.r), hit = wantTags.filter(t => labels.includes(t)).length;
-          score += hit === wantTags.length ? 18 : hit * 6;
+          score += hit === wantTags.length ? 8 : hit * 3;
         }
-        score += Math.min(recipeLikeScore(c.r), 4) * 5;                   // 좋아하는 메뉴·재료·맛
+        score += Math.min(recipeLikeScore(c.r), 3) * 3;                   // 좋아하는 메뉴·재료·맛
         for (const w of wishIngs) if (!w.done && recipeHasIng(c.r, w.name)) score += 30; // 먹고 싶은 재료
         const u = used[c.key] || 0;
         score -= u >= 2 ? 100 : u * 8;                                   // 한 주에 같은 메뉴 최대 2번
@@ -122,6 +127,7 @@ function buildPlan(slots, seed, wantTags = [], wishes = []) {
       .sort((a, b) => b.score - a.score);
     const pick = scored[0];
     if (!pick) return { ...s, key: null, alts: [], missing: 0 };
+    for (const st of pick.cov.items) touched.add(st);
     consumeStock(pick.r, stock);
     for (const w of wishIngs) if (recipeHasIng(pick.r, w.name)) w.done = true;
     used[pick.key] = (used[pick.key] || 0) + 1;
@@ -283,6 +289,7 @@ function openPlanner() {
     const ok = plan.filter(s => s.key && !s.missing).length, need = plan.filter(s => s.key && s.missing).length;
     panel.innerHTML = sheetHeader('이번 주 식단', '<button class="link" data-x="back">끼니 수정</button>', '<button class="link" data-x="close">닫기</button>') + `
       <div class="plan-summary"><span class="ok">🧊 장 안 보고 가능 <b class="num">${ok}</b>끼</span><span class="need">🛒 장 봐야 <b class="num">${need}</b>끼</span></div>
+      ${fridgeUseHtml(plan)}
       <section class="card">
         ${byDay.map(({ d, slots }) => {
           const p = slots.reduce((a, s) => a + (s.key ? RECIPES[+s.key.slice(1)].p : 0), 0);
@@ -360,6 +367,24 @@ function openPlanner() {
     }
   });
   drawPick();
+}
+
+// 식단 결과: 냉장고 재료가 이번 식단에 들어갔는지
+function fridgeUseHtml(plan) {
+  const items = db.fridge.filter(f => !(f.exp && f.exp < today()) && !['생수', '주스'].some(w => normName(f.name).includes(w)));
+  if (!items.length) return '';
+  const recs = plan.filter(s => s.key).map(s => RECIPES[+s.key.slice(1)]);
+  const rows = items.map(f => {
+    const rice = normName(f.name).includes('쌀'); // 쌀은 '밥'이 들어간 메뉴에 쓰여요
+    const n = recs.filter(r => r.i.some(([x]) => covers(f.name, x) || (rice && normName(x) === '밥'))).length;
+    const none = !n && !recipesForIng(f.name).length;
+    return { f, n, none };
+  }).sort((a, b) => (a.n > 0) - (b.n > 0) || (a.f.exp || '9').localeCompare(b.f.exp || '9'));
+  const usedN = rows.filter(x => x.n).length;
+  return `<section class="card"><div class="card-h"><h2>🧊 냉장고 재료 쓰임</h2><span class="meta num">${usedN}/${rows.length}개 사용</span></div>
+    <div class="chips">${rows.map(({ f, n, none }) => `<span class="fu-chip ${n ? 'used' : none ? 'none' : ''}">${n ? '✓ ' : ''}${esc(f.name)}${n > 1 ? ` ×${n}` : ''}${none ? ' · 레시피 없음' : ''}</span>`).join('')}</div>
+    ${rows.some(x => !x.n && !x.none) ? '<p class="small muted" style="margin:8px 0 0">회색은 이번 식단엔 안 들어간 재료예요. 끼니를 늘리거나 ‘바꾸기’로 넣을 수 있어요.</p>' : ''}
+    ${rows.some(x => x.none) ? '<p class="small muted" style="margin:4px 0 0">‘레시피 없음’ 재료는 Claude에게 알려 주면 레시피를 넣어 드려요.</p>' : ''}</section>`;
 }
 
 // 저장된 식단 중 오늘 이후 것
