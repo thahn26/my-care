@@ -609,3 +609,7 @@ button.wk-day { color: var(--text); }
 .fu-chip { padding: 4px 10px; border-radius: 999px; background: var(--fill); color: var(--sub); font-size: 13px; font-weight: 600; }
 .fu-chip.used { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); }
 .fu-chip.none { background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); }
+.plan-slot-wrap { display: flex; align-items: center; gap: 4px; }
+.plan-slot-wrap > .plan-slot { flex: 1; min-width: 0; }
+.ps-edit { flex: none; font-size: 16px; color: var(--accent); }
+.ps-btns { display: flex; gap: 4px; flex: none; }

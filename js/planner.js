@@ -27,12 +27,34 @@ function seededRandom(seed) {
   };
 }
 
+// ── 한 끼가 되는지 ──
+const CARB_WORDS = ['밥', '면', '빵', '떡', '우동', '국수', '파스타', '감자', '고구마', '오트밀', '또띠아', '만두', '누룽지', '쌀', '단호박'];
+const hasCarb = (r) => r.i.some(([n]) => CARB_WORDS.some(c => normName(n).includes(c)));
+// 차·과일 컵처럼 끼니가 아닌 것
+const isSnack = (r) => (r.tag || []).includes('간식') || /차$|주스|스무디|라떼/.test(r.n) || r.k < 120 || mealRecipe(r).p < 8; // 단백질이 거의 없으면 간식
+// 국·반찬·구이처럼 그것만으론 한 끼가 안 되는 메뉴는 밥 반 공기를 곁들여요
+function needsRice(r) {
+  const t = r.tag || [];
+  if (hasCarb(r) || ['아침', '불 없이', '불없이', '샐러드', '쉐이크'].some(x => t.includes(x))) return false;
+  return ['국', '반찬', '구이', '볶음', '조림'].some(x => t.includes(x)) || r.k < 300;
+}
+function mealRecipe(r) { return needsRice(r) ? { ...r, i: [...r.i, ['밥', '반 공기']], k: r.k + 150, p: r.p + 3 } : r; }
+// 식단 칸의 값: 'r123'(레시피) 또는 'c:직접 적은 메뉴'
+const planR = (key) => key && key[0] === 'r' ? RECIPES[+key.slice(1)] : null;
+function planName(key) {
+  if (!key) return '';
+  if (key.startsWith('c:')) return key.slice(2);
+  const r = planR(key);
+  return r ? r.n + (needsRice(r) ? ' + 밥 반 공기' : '') : '';
+}
+
 function slotFits(r, meal, day) {
   const tags = r.tag || [];
-  if (tags.includes('상비반찬')) return false;          // 멸치볶음 같은 반찬만으로는 한 끼가 안 됨
+  if (tags.includes('상비반찬') || isSnack(r)) return false; // 반찬·차만으로는 한 끼가 안 됨
   if (tags.includes('쉐이크')) return false;            // 쉐이크는 내가 고른 끼니에만
   if (meal === '아침') return tags.includes('아침') || tags.includes('불 없이') || r.t <= 7;
-  if (tags.includes('아침')) return false;            // 점심·저녁에 쉐이크·토스트 같은 아침 메뉴 X
+  // 요거트 볼·토스트 같은 아침 메뉴는 주말이나 저녁의 가벼운 한 끼로만
+  if (tags.includes('아침') && (r.k < 200 || (meal === '점심' && isWeekday(day)))) return false;
   if (meal === '점심' && isWeekday(day)) return !!r.d; // 평일 점심은 도시락 가능한 메뉴만
   return true;
 }
@@ -62,15 +84,15 @@ function stockUse(stock, name, amount) {
 }
 function coverage(r, stock) {
   let have = 0, urgent = false;
-  const items = [];
+  const items = [], miss = [];
   for (const [n, a] of r.i) {
     const u = stockUse(stock, n, a);
-    if (!u) continue;
+    if (!u) { miss.push(n); continue; }
     have++;
     items.push(u.st);
     if (u.st.exp && diffDays(u.st.exp, today()) <= 3) urgent = true;
   }
-  return { have, total: r.i.length, ratio: r.i.length ? have / r.i.length : 0, urgent, items };
+  return { have, total: r.i.length, ratio: r.i.length ? have / r.i.length : 0, urgent, items, miss, main: !miss.includes(r.i[0][0]) };
 }
 function consumeStock(r, stock) {
   for (const [n, a] of r.i) {
@@ -105,10 +127,13 @@ function buildPlan(slots, seed, wantTags = [], wishes = []) {
     const scored = RECIPES.map((r, i) => ({ r, key: 'r' + i }))
       .filter(c => fixed[si] ? c.key === fixed[si] : slotFits(c.r, s.meal, s.day) && !recipeBlocked(c.r))
       .map(c => {
-        const cov = coverage(c.r, stock);
+        const m = mealRecipe(c.r), cov = coverage(m, stock);
         // 냉장고가 1순위: 있는 재료를 많이 쓰고, 아직 안 쓴 재료를 쓰고, 사야 할 게 적은 메뉴
         const missing = cov.total - cov.have, fresh = cov.items.filter(st => !touched.has(st)).length;
-        let score = cov.have * 10 + fresh * 18 - missing * 12 + (missing === 0 ? 15 : 0) + rand() * 4 + c.r.p / 10;
+        // 채소는 냉장고의 다른 채소로 바꿔 써도 되니 덜 깎아요
+        const hasVeg = stock.some(x => x.qty > 0.05 && ingredientGroup(x.name) === '채소');
+        const missPenalty = cov.miss.reduce((a, n) => a + (hasVeg && ingredientGroup(n) === '채소' ? 4 : 12), 0);
+        let score = cov.have * 10 + fresh * 18 - missPenalty + (missing === 0 ? 15 : 0) + (cov.main && cov.have ? 15 : 0) + rand() * 4 + c.r.p / 10;
         if (cov.urgent) score += Math.max(0, 20 - dayIdx * 4);          // 임박 재료는 앞쪽 날에
         if (wantTags.length) {                                          // 고른 스타일은 그다음
           const labels = recipeTags(c.r), hit = wantTags.filter(t => labels.includes(t)).length;
@@ -128,7 +153,7 @@ function buildPlan(slots, seed, wantTags = [], wishes = []) {
     const pick = scored[0];
     if (!pick) return { ...s, key: null, alts: [], missing: 0 };
     for (const st of pick.cov.items) touched.add(st);
-    consumeStock(pick.r, stock);
+    consumeStock(mealRecipe(pick.r), stock);
     for (const w of wishIngs) if (recipeHasIng(pick.r, w.name)) w.done = true;
     used[pick.key] = (used[pick.key] || 0) + 1;
     mains[mainIngredient(pick.r)] = (mains[mainIngredient(pick.r)] || 0) + 1;
@@ -142,8 +167,9 @@ function buildPlan(slots, seed, wantTags = [], wishes = []) {
 function recheckPlan(plan) {
   const stock = planStock();
   for (const s of plan) {
-    if (!s.key) continue;
-    const r = RECIPES[+s.key.slice(1)], cov = coverage(r, stock);
+    const r0 = planR(s.key);
+    if (!r0) { s.missing = 0; continue; }
+    const r = mealRecipe(r0), cov = coverage(r, stock);
     s.missing = cov.total - cov.have;
     consumeStock(r, stock);
   }
@@ -201,8 +227,9 @@ function buyLabel(name, sums) {
 function planShopping(plan) {
   const need = new Map(); // 정규화 이름 → { name, sums, recipes:Set, meals }
   for (const s of plan) {
-    if (!s.key) continue;
-    const r = RECIPES[+s.key.slice(1)];
+    const r0 = planR(s.key);
+    if (!r0) continue;
+    const r = mealRecipe(r0);
     for (const [name, amount] of r.i) {
       const k = normName(name);
       const e = need.get(k) || { name, sums: {}, recipes: new Set(), meals: 0 };
@@ -292,11 +319,11 @@ function openPlanner() {
       ${fridgeUseHtml(plan)}
       <section class="card">
         ${byDay.map(({ d, slots }) => {
-          const p = slots.reduce((a, s) => a + (s.key ? RECIPES[+s.key.slice(1)].p : 0), 0);
+          const p = slots.reduce((a, s) => a + (planR(s.key) ? mealRecipe(planR(s.key)).p : 0), 0);
           return `<div class="plan-day"><div class="row-between"><b>${shortDate(d)}</b><span class="small muted num">단백질 ${n0(p)}g${slots.length === 3 ? ` / ${g.protein}g` : ''}</span></div>
-            ${slots.map(s => { const r = s.key && RECIPES[+s.key.slice(1)]; return `<div class="plan-slot"><span class="ps-meal">${PLAN_ICON[s.meal]} ${s.meal}</span>
-              <span class="ps-name">${s.wished ? '<span class="wish-star">⭐</span>' : ''}${r ? esc(r.n) : '맞는 메뉴 없음'}<small class="num">${r ? ` ${r.p}g · ${r.k}kcal` : ''}</small>${r ? (s.missing ? `<span class="ps-badge need">+${s.missing}개 사야 해요</span>` : '<span class="ps-badge ok">냉장고 재료로 OK</span>') : ''}</span>
-              <button class="btn sm" data-x="swap" data-k="${s.day}|${s.meal}">바꾸기</button></div>`; }).join('')}</div>`;
+            ${slots.map(s => { const r = planR(s.key), m = r && mealRecipe(r), mine = s.key && s.key.startsWith('c:'); return `<div class="plan-slot"><span class="ps-meal">${PLAN_ICON[s.meal]} ${s.meal}</span>
+              <span class="ps-name">${s.wished ? '<span class="wish-star">⭐</span>' : ''}${s.key ? esc(planName(s.key)) : '맞는 메뉴 없음'}<small class="num">${m ? ` ${m.p}g · ${m.k}kcal` : ''}</small>${mine ? '<span class="ps-badge ok">직접 넣음</span>' : r ? (s.missing ? `<span class="ps-badge need">+${s.missing}개 사야 해요</span>` : '<span class="ps-badge ok">냉장고 재료로 OK</span>') : ''}</span>
+              <span class="ps-btns"><button class="btn sm" data-x="swap" data-k="${s.day}|${s.meal}">바꾸기</button><button class="btn sm" data-x="mine" data-k="${s.day}|${s.meal}">직접</button></span></div>`; }).join('')}</div>`;
         }).join('')}
         <button class="btn block sm" data-x="reroll" style="margin-top:6px">🔀 전부 다시 짜기</button>
       </section>
@@ -356,6 +383,14 @@ function openPlanner() {
       const alts = s.alts.filter(k => !sameDay.includes(k));
       if (alts.length) { s.key = alts[(alts.indexOf(s.key) + 1) % alts.length]; recheckPlan(plan); shop = planShopping(plan); drawResult(); }
     }
+    else if (x === 'mine') {
+      const s = plan.find(v => `${v.day}|${v.meal}` === b.dataset.k);
+      openPlanSlotEdit(s.day, s.meal, (key) => {
+        if (key === undefined) return;
+        if (!s.alts.length && planR(s.key)) s.alts = [s.key];
+        s.key = key; s.wished = false; recheckPlan(plan); shop = planShopping(plan); drawResult();
+      }, true);
+    }
     else if (x === 'toggle') { const it = shop[+b.closest('[data-i]').dataset.i]; it.on = !it.on; drawResult(); }
     else if (x === 'save') {
       const daysMap = {};
@@ -373,7 +408,7 @@ function openPlanner() {
 function fridgeUseHtml(plan) {
   const items = db.fridge.filter(f => !(f.exp && f.exp < today()) && !['생수', '주스'].some(w => normName(f.name).includes(w)));
   if (!items.length) return '';
-  const recs = plan.filter(s => s.key).map(s => RECIPES[+s.key.slice(1)]);
+  const recs = plan.map(s => planR(s.key)).filter(Boolean).map(mealRecipe);
   const rows = items.map(f => {
     const rice = normName(f.name).includes('쌀'); // 쌀은 '밥'이 들어간 메뉴에 쓰여요
     const n = recs.filter(r => r.i.some(([x]) => covers(f.name, x) || (rice && normName(x) === '밥'))).length;
@@ -399,20 +434,65 @@ function renderPlanCard() {
   if (!up.length) return `<button class="big-action" data-action="openPlanner" style="width:100%;margin-bottom:12px;background:var(--kitchen);color:#fff"><span class="ic">🗓</span><b>이번 주 식단 짜기</b><span style="color:rgba(255,255,255,.9)">요일별로 집밥 끼니를 고르면 메뉴와 장보기를 자동으로 짜 줘요 (무료)</span></button>`;
   return `<section class="card"><div class="card-h"><h2>🗓 이번 주 식단</h2><button class="link small" data-action="openPlanner">다시 짜기</button></div>
     ${up.slice(0, 7).map(({ d, meals }) => `<div class="plan-day compact"><b class="small">${d === today() ? '오늘' : shortDate(d)}</b>
-      ${PLAN_MEALS.filter(m => meals[m]).map(m => { const r = RECIPES[+meals[m].slice(1)]; return r ? `<button class="plan-slot link-row" data-action="planRecipe" data-key="${meals[m]}" data-meal="${m}"><span class="ps-meal">${PLAN_ICON[m]} ${m}</span><span class="ps-name">${esc(r.n)}</span><span class="chev">›</span></button>` : ''; }).join('')}</div>`).join('')}
+      ${PLAN_MEALS.map(m => planSlotRow(d, m, meals[m], true)).join('')}</div>`).join('')}
+    <p class="small muted" style="margin:8px 0 0">✎를 누르면 그 끼니를 직접 바꾸거나 내가 먹을 메뉴를 적을 수 있어요.</p>
   </section>`;
+}
+
+// 저장된 식단 한 칸: 레시피면 누르면 레시피, 직접 적은 메뉴면 글자만. ✎로 바꾸기
+function planSlotRow(day, m, key, showEmpty = false) {
+  if (!key && !(showEmpty && m !== '아침')) return '';
+  const r = planR(key), mr = r && mealRecipe(r);
+  const done = r && peekDay(day).meals.some(x => x.src === 'recipe' && x.name === r.n);
+  const body = `<span class="ps-meal">${PLAN_ICON[m]} ${m}</span><span class="ps-name">${key ? esc(planName(key)) : '<span class="muted">비어 있어요</span>'}${mr ? `<small class="num"> ${mr.p}g</small>` : ''}</span>`;
+  return `<div class="plan-slot-wrap">${r ? `<button class="plan-slot link-row" data-action="planRecipe" data-key="${key}" data-meal="${m}">${body}${done ? '<span class="ok-badge">완료</span>' : '<span class="chev">›</span>'}</button>` : `<div class="plan-slot">${body}</div>`}
+    <button class="x-btn ps-edit" data-action="planSlotEdit" data-date="${day}" data-meal="${m}" aria-label="${m} 직접 바꾸기">${key ? '✎' : '＋'}</button></div>`;
+}
+// 한 끼 직접 넣기: 레시피 검색 또는 아무 메뉴나 적기
+function openPlanSlotEdit(day, meal, done, keepSheet = false) {
+  let q = '';
+  const host = keepSheet ? document.createElement('div') : null;
+  const panel = keepSheet ? host : openSheet('', { onClose: () => render() });
+  if (keepSheet) { host.className = 'sheet open'; host.style.zIndex = 70; host.innerHTML = '<div class="backdrop"></div><div class="panel"></div>'; document.body.appendChild(host); }
+  const box = keepSheet ? host.querySelector('.panel') : panel;
+  const finish = (key) => { if (keepSheet) host.remove(); else closeSheet(); done(key); };
+  const list = () => {
+    const t = q.replace(/\s+/g, '');
+    const hits = t ? RECIPES.map((r, i) => ({ r, i })).filter(x => x.r.n.replace(/\s+/g, '').includes(t) && !(x.r.tag || []).includes('상비반찬')).slice(0, 6) : [];
+    return `${hits.map(x => `<button data-y="pick" data-k="r${x.i}"><span>🍽 ${esc(x.r.n)}</span><small class="num">${x.r.p}g · ${x.r.k}kcal</small></button>`).join('')}
+      ${q.trim() ? `<button data-y="pick" data-k="c:${esc(q.trim())}"><span>✏️ ‘${esc(q.trim())}’ 그대로 넣기</span><small>직접</small></button>` : ''}`;
+  };
+  const draw = () => {
+    box.innerHTML = sheetHeader(`${shortDate(day)} ${meal}`, '', '<button class="link" data-y="cancel">취소</button>') + `
+      <section class="card"><p class="small muted" style="margin:0 0 8px">레시피를 찾거나, 먹을 메뉴를 그대로 적어요. 예: 그릭요거트 + 아보카도, 회사 식당, 순대 반 접시</p>
+        <input id="slotQ" class="input" placeholder="메뉴 이름" autocomplete="off" value="${esc(q)}">
+        <div class="suggest" id="slotList">${list()}</div></section>
+      <div class="btn-row"><button class="btn" data-y="pick" data-k="">이 끼니 비우기</button></div>`;
+    const inp = box.querySelector('#slotQ'); inp.focus();
+  };
+  box.addEventListener('input', (e) => { if (e.target.id === 'slotQ') { q = e.target.value; box.querySelector('#slotList').innerHTML = list(); } });
+  box.addEventListener('keydown', (e) => { if (e.target.id === 'slotQ' && e.key === 'Enter' && q.trim()) finish('c:' + q.trim()); });
+  box.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-y]'); if (!b) return;
+    if (b.dataset.y === 'cancel') { if (keepSheet) host.remove(); else closeSheet(); return; }
+    if (b.dataset.y === 'pick') finish(b.dataset.k || null);
+  });
+  if (keepSheet) host.querySelector('.backdrop').onclick = () => host.remove();
+  draw();
+}
+function editSavedSlot(day, meal) {
+  openPlanSlotEdit(day, meal, (key) => {
+    db.plan = db.plan || { created: today(), days: {} };
+    const d = db.plan.days[day] = db.plan.days[day] || {};
+    if (key) d[meal] = key; else delete d[meal];
+    save(); render(); toast(key ? '식단에 넣었어요' : '이 끼니를 비웠어요');
+  });
 }
 
 // 홈: 선택한 날의 식단
 function renderTodayPlan(day) {
   const meals = db.plan?.days?.[day];
   if (!meals) return '';
-  const rows = PLAN_MEALS.filter(m => meals[m]).map(m => {
-    const r = RECIPES[+meals[m].slice(1)];
-    if (!r) return '';
-    const done = peekDay(day).meals.some(x => x.src === 'recipe' && x.name === r.n);
-    return `<button class="plan-slot link-row" data-action="planRecipe" data-key="${meals[m]}" data-meal="${m}">
-      <span class="ps-meal">${PLAN_ICON[m]} ${m}</span><span class="ps-name">${esc(r.n)}<small class="num"> ${r.p}g</small></span>${done ? '<span class="ok-badge">완료</span>' : '<span class="chev">›</span>'}</button>`;
-  }).join('');
+  const rows = PLAN_MEALS.filter(m => meals[m]).map(m => planSlotRow(day, m, meals[m])).join('');
   return `<section class="card"><div class="card-h"><h2>${day === today() ? '오늘' : dateLabel(day)}의 식단</h2><button class="link small" data-action="kitchen" data-sub="recipes">이번 주 ›</button></div>${rows}</section>`;
 }
