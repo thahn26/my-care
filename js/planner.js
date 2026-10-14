@@ -30,6 +30,7 @@ function seededRandom(seed) {
 function slotFits(r, meal, day) {
   const tags = r.tag || [];
   if (tags.includes('상비반찬')) return false;          // 멸치볶음 같은 반찬만으로는 한 끼가 안 됨
+  if (tags.includes('쉐이크')) return false;            // 쉐이크는 내가 고른 끼니에만
   if (meal === '아침') return tags.includes('아침') || tags.includes('불 없이') || r.t <= 7;
   if (tags.includes('아침')) return false;            // 점심·저녁에 쉐이크·토스트 같은 아침 메뉴 X
   if (meal === '점심' && isWeekday(day)) return !!r.d; // 평일 점심은 도시락 가능한 메뉴만
@@ -85,6 +86,9 @@ function buildPlan(slots, seed, wantTags = [], wishes = []) {
   const used = {}, mains = {}, byDay = {};
   // 먹고 싶다고 한 메뉴는 맞는 끼니에 먼저 자리를 잡는다
   const fixed = {};
+  // 쉐이크로 고른 끼니는 쉐이크로
+  const shakeIdx = RECIPES.findIndex(r => (r.tag || []).includes('쉐이크'));
+  slots.forEach((s, i) => { if (s.shake && shakeIdx >= 0) fixed[i] = 'r' + shakeIdx; });
   for (const w of wishes.filter(w => w.type === 'recipe')) {
     const ri = RECIPES.findIndex(r => r.n === w.name);
     if (ri < 0) continue;
@@ -99,7 +103,7 @@ function buildPlan(slots, seed, wantTags = [], wishes = []) {
       .filter(c => fixed[si] ? c.key === fixed[si] : slotFits(c.r, s.meal, s.day) && !recipeBlocked(c.r))
       .map(c => {
         const cov = coverage(c.r, stock);
-        let score = cov.ratio * 40 + (cov.have === cov.total ? 25 : 0) + rand() * 4 + c.r.p / 8;
+        let score = cov.ratio * 30 + cov.have * 9 + (cov.have === cov.total ? 15 : 0) + rand() * 4 + c.r.p / 8; // 냉장고 재료를 많이 쓰는 메뉴 우선
         if (cov.urgent) score += Math.max(0, 12 - dayIdx * 3);          // 임박 재료는 앞쪽 날에
         if (wantTags.length) {
           const labels = recipeTags(c.r), hit = wantTags.filter(t => labels.includes(t)).length;
@@ -223,7 +227,7 @@ function planShopping(plan) {
 function openPlanner() {
   const days = planDays(), pat = planPattern();
   const sel = {}; // 'day|meal' → true
-  for (const d of days) for (const m of PLAN_MEALS) if (pat[parse(d).getDay()][m]) sel[`${d}|${m}`] = true;
+  for (const d of days) for (const m of PLAN_MEALS) if (pat[parse(d).getDay()][m]) sel[`${d}|${m}`] = pat[parse(d).getDay()][m];
   let seed = Date.now() % 100000, plan = null, shop = [];
   let want = [...(db.settings.planTags || [])];
   let wishes = [], wishQ = ''; // [{ type: 'recipe'|'ing', name }]
@@ -233,9 +237,9 @@ function openPlanner() {
   const drawPick = () => {
     panel.innerHTML = sheetHeader('이번 주 식단 짜기') + `
       <section class="card">
-        <p class="small muted" style="margin:0 0 10px">집에서 먹을 끼니를 눌러 주세요. 평일 점심은 도시락 메뉴로, 아침은 5분 메뉴로 골라요.</p>
+        <p class="small muted" style="margin:0 0 10px">집에서 먹을 끼니를 눌러 주세요. 한 번 더 누르면 🥤 쉐이크로 대신해요(하루 한 번까지). 평일 점심은 도시락 메뉴로 골라요.</p>
         <table class="plan-grid"><thead><tr><th></th>${PLAN_MEALS.map(m => `<th>${PLAN_ICON[m]} ${m}</th>`).join('')}</tr></thead>
-        <tbody>${days.map(d => `<tr><th class="${parse(d).getDay() % 6 === 0 ? 'we' : ''}">${shortDate(d)}</th>${PLAN_MEALS.map(m => `<td><button class="pg ${sel[`${d}|${m}`] ? 'on' : ''}" data-x="cell" data-k="${d}|${m}" aria-label="${shortDate(d)} ${m}">${sel[`${d}|${m}`] ? CHECK_SVG : ''}</button></td>`).join('')}</tr>`).join('')}</tbody></table>
+        <tbody>${days.map(d => `<tr><th class="${parse(d).getDay() % 6 === 0 ? 'we' : ''}">${shortDate(d)}</th>${PLAN_MEALS.map(m => `<td><button class="pg ${sel[`${d}|${m}`] ? 'on' : ''} ${sel[`${d}|${m}`] === 'shake' ? 'shake' : ''}" data-x="cell" data-k="${d}|${m}" aria-label="${shortDate(d)} ${m}">${sel[`${d}|${m}`] === 'shake' ? '🥤' : sel[`${d}|${m}`] ? CHECK_SVG : ''}</button></td>`).join('')}</tr>`).join('')}</tbody></table>
         <div class="chips" style="margin-top:12px">
           <button class="chip" data-x="preset" data-v="lunchdinner">평일 점심 + 매일 저녁</button>
           <button class="chip" data-x="preset" data-v="dinner">매일 저녁</button>
@@ -300,7 +304,7 @@ function openPlanner() {
 
   const build = () => {
     const slots = [];
-    for (const d of days) for (const m of PLAN_MEALS) if (sel[`${d}|${m}`]) slots.push({ day: d, meal: m });
+    for (const d of days) for (const m of PLAN_MEALS) if (sel[`${d}|${m}`]) slots.push({ day: d, meal: m, shake: sel[`${d}|${m}`] === 'shake' });
     plan = buildPlan(slots, seed, want, wishes);
     shop = planShopping(plan);
     drawResult();
@@ -311,7 +315,12 @@ function openPlanner() {
     if (!b) return;
     const x = b.dataset.x;
     if (x === 'close') return closeSheet();
-    if (x === 'cell') { sel[b.dataset.k] = !sel[b.dataset.k]; drawPick(); }
+    if (x === 'cell') {
+      const k = b.dataset.k, v = sel[k], day = k.split('|')[0];
+      const shakeToday = PLAN_MEALS.some(m => `${day}|${m}` !== k && sel[`${day}|${m}`] === 'shake');
+      sel[k] = !v ? true : v === true && !shakeToday ? 'shake' : false;
+      drawPick();
+    }
     else if (x === 'wish') {
       wishes.push({ type: b.dataset.t, name: b.dataset.n });
       wishQ = ''; drawPick();
@@ -328,7 +337,7 @@ function openPlanner() {
     else if (x === 'build') {
       // 고른 끼니를 요일 패턴으로 기억
       const p = {};
-      for (const d of days) p[parse(d).getDay()] = Object.fromEntries(PLAN_MEALS.map(m => [m, !!sel[`${d}|${m}`]]));
+      for (const d of days) p[parse(d).getDay()] = Object.fromEntries(PLAN_MEALS.map(m => [m, sel[`${d}|${m}`] === 'shake' ? 'shake' : !!sel[`${d}|${m}`]]));
       db.settings.planPattern = p; db.settings.planTags = want; save();
       build();
     }

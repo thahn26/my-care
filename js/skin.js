@@ -1,8 +1,8 @@
 // 케어 › 피부: 내 맞춤 요일별 루틴(아침·점심·저녁) + 오늘 피부 고민 + 피코·레티놀 일정 + 화장대 + 살 것 + 디바이스
 // 내 제품·루틴·규칙 데이터는 data/my-skin.js
 const SKIN_TODAY = Object.keys(MY_TODAY);
-const COS_CATS = ['클렌징오일', '클렌저', '토너·에센스', '세럼·앰플', '크림', '아이크림', '선크림', '베이스', '각질제거', '마스크팩', '바디', '두피', '디바이스', '기타'];
-const CAT_ART = { 클렌징오일: 'pump', 클렌저: 'tube', '토너·에센스': 'bottle', '세럼·앰플': 'dropper', 크림: 'jar', 아이크림: 'tube', 선크림: 'tube', 베이스: 'foundation', 각질제거: 'padjar', 마스크팩: 'sheet', 바디: 'pump', 두피: 'pump', 디바이스: 'wand', 기타: 'bottle' };
+const COS_CATS = ['클렌징오일', '클렌저', '토너·에센스', '세럼·앰플', '크림', '아이크림', '선크림', '베이스', '입술', '각질제거', '마스크팩', '바디', '두피', '디바이스', '기타'];
+const CAT_ART = { 클렌징오일: 'pump', 클렌저: 'tube', '토너·에센스': 'bottle', '세럼·앰플': 'dropper', 크림: 'jar', 아이크림: 'tube', 선크림: 'tube', 베이스: 'foundation', 입술: 'lip', 각질제거: 'padjar', 마스크팩: 'sheet', 바디: 'pump', 두피: 'pump', 디바이스: 'wand', 기타: 'bottle' };
 const COS_PALETTE = ['#f7b3c6', '#a8d8ef', '#bfe3a4', '#f5e3b0', '#dccdf3', '#f8c99b', '#9fded0', '#f3d9df'];
 const COS_ACTIVES = ['비타민C', '나이아신아마이드', '알부틴', '트라넥삼산', '레티놀', '아데노신', '펩타이드', 'AHA', 'BHA', 'PHA', '우레아', '히알루론산', '세라마이드', '시카', '판테놀'];
 const COS_FUNCS = ['미백', '주름개선', '자외선차단'];
@@ -22,7 +22,7 @@ function skinData() {
   if (!db.skin) db.skin = { concerns: [], routine: null, products: [], log: {} };
   const s = db.skin;
   s.pico = s.pico || []; s.buy = s.buy || {}; s.devLog = s.devLog || {};
-  if (!s.myV) {
+  if ((s.myV || 0) < MY_SKIN_V) {
     for (const p of s.products) if (p.cat === '토너') p.cat = '토너·에센스';
     installMine(s); save();
   }
@@ -33,10 +33,12 @@ function skinLog(k) { const s = skinData(); return s.log[k] || (s.log[k] = { con
 // 내 화장품을 화장대에 넣고 내 루틴으로 바꾸기 (처음 한 번)
 function installMine(s) {
   for (const c of MY_COS) {
-    if (s.products.some(x => x.id === 'my-' + c.sid || normName(x.name) === normName(c.name))) continue;
+    const have = s.products.find(x => x.id === 'my-' + c.sid);
+    if (have) { have.note = c.note || have.note; continue; }
+    if (s.products.some(x => normName(x.name) === normName(c.name))) continue;
     s.products.push({ id: 'my-' + c.sid, sid: c.sid, name: c.name, cat: c.cat, actives: c.actives || [], funcs: c.funcs || [], status: '사용중', opened: '', pao: '', exp: '', staple: false, added: today(), art: c.art, color: c.c, cap: c.k || '', note: c.note || '', rest: !!c.rest });
   }
-  s.myV = 1;
+  s.myV = MY_SKIN_V;
   s.routine = myRoutine();
 }
 function seedId(sid) {
@@ -64,21 +66,29 @@ function picoInfo(k) {
   }
   return main ? { ...main, skip, add } : null;
 }
-function retinolDays(k) {
-  const st = skinData().retinolStart;
+// 레티놀 단계: 시작일부터 2주마다 한 단계 (각질이 일어나면 2단계에 머물기)
+function retinolStage(k) {
+  const s = skinData(), st = s.retinolStart;
   if (!st || k < st) return null;
-  const w = Math.floor(diffDays(k, st) / 7);
-  return w < 2 ? [0] : w < 4 ? [0, 4] : [0, 2, 4];
+  const i = Math.min(Math.floor(diffDays(k, st) / 14), (s.retinolMax || RETINOL_STEPS.length) - 1, RETINOL_STEPS.length - 1);
+  return { i, ...RETINOL_STEPS[i] };
 }
+function retinolDays(k) { return retinolStage(k)?.days || null; }
 function retinolPlan() {
   const st = skinData().retinolStart;
   if (!st) return null;
-  const days = retinolDays(today()) || [0];
-  return { week: Math.max(1, Math.floor(diffDays(today(), st) / 7) + 1), text: days.map(d => WD_SHORT[d]).join('·') + `요일 (주 ${days.length}회)` };
+  const g = retinolStage(today()) || { i: 0, ...RETINOL_STEPS[0] };
+  return { week: Math.max(1, Math.floor(diffDays(today(), st) / 7) + 1), stage: g, text: g.days.map(d => WD_SHORT[d]).join('·') + `요일 (주 ${g.days.length}회)` };
 }
 
 // ── 그날 실제 루틴 (요일 + 피코 일정 + 레티놀 + 오늘 고민) ──
+// 각질 제거·레티놀 한 다음 날 아침엔 괄사를 쉬어요
 function routineFor(k) {
+  const out = buildDay(k), prev = buildDay(addDays(k, -1));
+  if (prev.pm.some(x => !x.skipped && hasTag(x, 'exfo', 'retinol'))) for (const x of out.am) if (!x.skipped && hasTag(x, 'guasha')) x.skipped = '어제 각질 제거·레티놀';
+  return out;
+}
+function buildDay(k) {
   const s = skinData(), wd = parse(k).getDay(), day = s.log[k] || {};
   const con = (day.concerns || []).filter(c => MY_TODAY[c]);
   const pico = picoInfo(k), rdays = retinolDays(k);
@@ -94,8 +104,8 @@ function routineFor(k) {
       .filter(st => st.retinol ? !!rdays && rdays.includes(wd) : (!st.days || st.days.includes(wd)))
       .map(st => ({ ...st, skipped: why(st) }));
   }
-  // 레티놀 하는 밤엔 갈바닉·각질 제거를 쉬어요
-  if (out.pm.some(x => !x.skipped && hasTag(x, 'retinol'))) for (const x of out.pm) if (!x.skipped && hasTag(x, 'galv', 'exfo')) x.skipped = '레티놀 하는 날';
+  // 레티놀 하는 밤엔 그 자리의 각질 제거·마스크·기기를 쉬어요
+  if (out.pm.some(x => !x.skipped && hasTag(x, 'retinol'))) for (const x of out.pm) if (!x.skipped && hasTag(x, 'exfo', 'mask', 'device')) x.skipped = '레티놀 하는 날';
 
   const adds = { am: [], noon: [], pm: [] };
   if (pico) for (const t of TK) adds[t].push(...pico.add[t]);
@@ -103,13 +113,15 @@ function routineFor(k) {
   for (const t of TK) {
     const list = out[t], keys = new Set(list.filter(x => !x.skipped).map(x => x.key));
     let exfoOn = list.some(x => !x.skipped && hasTag(x, 'exfo', 'retinol'));
-    const exfoDay = list.some(x => !x.skipped && hasTag(x, 'exfo'));
+    const exfoDay = list.some(x => !x.skipped && hasTag(x, 'exfo', 'retinol'));
+    let devOn = list.some(x => !x.skipped && hasTag(x, 'device')); // 하룻밤에 기기 하나만
     const mid = [], end = [], first = [];
     for (const a of adds[t]) {
       if (keys.has(a.key)) continue;
       if ((a.tags || []).some(g => skipT.has(g))) continue;
       if (hasTag(a, 'exfo')) { if (exfoOn) continue; exfoOn = true; }
       if (hasTag(a, 'mask') && exfoDay) continue;
+      if (hasTag(a, 'device')) { if (devOn || exfoDay) continue; devOn = true; }
       keys.add(a.key);
       const st = { id: 'd-' + a.key, key: a.key, name: a.name, cat: a.cat || '', productId: a.p ? seedId(a.p) : null, how: a.how || '', tags: a.tags || [], added: a.added };
       (a.first ? first : a.end ? end : mid).push(st);
@@ -129,7 +141,7 @@ function stepProduct(st) {
   if (hasTag(st, 'retinol')) return use.find(p => (p.actives || []).includes('레티놀')) || null;
   if (!st.cat) return null;
   const same = use.filter(p => p.cat === st.cat);
-  const prefer = st.key === 'sunre' ? /스틱|쿠션/ : st.key === 'body' ? /로션|우레아|SA|크림/ : null;
+  const prefer = st.key === 'sunre' ? /쿠션|스틱/ : st.key === 'body' ? /유리아|우레아|SA|로션/ : null;
   return (prefer && same.find(p => prefer.test(p.name))) || same[0] || null;
 }
 function skinProgress(k) {
@@ -171,10 +183,13 @@ function cosArtSvg(p, cls = '') {
 // ── 화면 ──
 function renderCare() {
   const sub = ['today', 'vanity', 'buy'].includes(db.ui.skinTab) ? db.ui.skinTab : 'today';
-  const s = skinData(), left = MY_BUY.filter(b => s.buy[b.id] !== 'done').length;
-  return `<div class="seg care-seg">
-      <button class="on">피부</button><button disabled>두피 · 준비 중</button><button disabled>치아 · 준비 중</button>
-    </div>
+  const s = skinData(), left = MY_BUY.filter(b => s.buy[b.id] !== 'done' && b.group === '지금 사기').length;
+  const seg = db.ui.careSeg === 'scalp' ? 'scalp' : 'skin';
+  const top = `<div class="seg care-seg">
+      <button class="${seg === 'skin' ? 'on' : ''}" data-action="careSeg" data-v="skin">피부</button><button class="${seg === 'scalp' ? 'on' : ''}" data-action="careSeg" data-v="scalp">두피</button><button disabled>치아 · 준비 중</button>
+    </div>`;
+  if (seg === 'scalp') return top + renderScalp();
+  return `${top}
     <div class="seg">
       <button class="${sub === 'today' ? 'on' : ''}" data-action="skinTab" data-v="today">루틴</button>
       <button class="${sub === 'vanity' ? 'on' : ''}" data-action="skinTab" data-v="vanity">화장대 ${s.products.filter(p => p.status !== '다씀').length || ''}</button>
@@ -222,8 +237,10 @@ function renderSkinToday() {
     ${sec('am', '🌅 아침')}${sec('noon', '☀️ 점심')}${sec('pm', '🌙 저녁')}
     ${alerts.length ? `<section class="card"><div class="card-h"><h2>성분 궁합</h2></div>${alerts.map(([lv, m]) => `<p class="alert-line ${lv}">${lv === 'warn' ? '⚠️' : '💡'} ${esc(m)}</p>`).join('')}</section>` : ''}
     <section class="card"><div class="card-h"><h2>요일별 특별 케어</h2><button class="link small" data-action="skinEdit">루틴 편집</button></div><div class="wk-grid">${special}</div>
-      <p class="small muted" style="margin:8px 0 0">각질 제거는 월·수·토 주 3번만, 사이사이 쉬는 날을 둬요. 요일을 누르면 그날 루틴을 볼 수 있어요.</p></section>
-    ${renderSkinPlan()}`;
+      <p class="small muted" style="margin:8px 0 0">각질 제거는 월·수·토 주 3번, 그날은 시트마스크·기기 없이. 다음 날 아침엔 괄사를 쉬어요. 요일을 누르면 그날 루틴을 볼 수 있어요.</p></section>
+    ${renderHabits()}
+    ${renderSkinPlan()}
+    ${renderGuasha()}`;
 }
 
 function renderSkinPlan() {
@@ -232,19 +249,55 @@ function renderSkinPlan() {
   return `<section class="card"><div class="card-h"><h2>💉 피코 토닝 일정</h2></div>
       ${s.pico.length ? `<ul class="plain-list">${[...s.pico].sort().map(d => { const n = diffDays(d, today()); return `<li><span>${dateLabel(d)}</span><span class="muted small">${n > 0 ? `D-${n}` : n === 0 ? '오늘' : `${-n}일 지남`}</span><button class="x-btn" data-action="picoDel" data-date="${d}" aria-label="피코 일정 삭제">×</button></li>`; }).join('')}</ul>` : ''}
       <div class="taste-add"><input id="picoDate" type="date" class="input" value="${addDays(today(), 7)}"><button class="btn sm" data-action="picoAdd">추가</button></div>
-      <p class="small muted" style="margin:8px 0 0">날짜를 넣으면 시술 1주 전부터 2주 뒤까지 각질 제거·레티놀·디바이스를 자동으로 빼요. 회차마다 넣어 주세요.</p></section>
+      <p class="small muted" style="margin:8px 0 0">날짜를 넣으면 시술 1주 전부터 2주 뒤까지 각질 제거·레티놀·기기·괄사를 자동으로 빼요. 회차마다 넣어 주세요.</p>
+      <p class="small" style="margin:10px 0 2px"><b>상담 때 물어볼 것</b></p><ul class="how-list small">${PICO_ASK.map(q => `<li>${esc(q)}</li>`).join('')}</ul></section>
     <section class="card"><div class="card-h"><h2>🌙 레티놀</h2>${rp ? `<span class="meta">${rp.week}주차</span>` : ''}</div>
-      ${rp ? `<p class="small" style="margin:0 0 8px">지금은 <b>${esc(rp.text)}</b> 저녁에 써요. 2주마다 하루씩 늘려요 (일 → 일·목 → 일·화·목). 각질이 일어나면 '오늘 피부 고민'에서 <b>각질·건조</b>를 눌러 그날은 쉬어요.</p>
-        <button class="link small danger" data-action="retinolStop">레티놀 그만두기</button>`
+      <div class="ret-steps">${RETINOL_STEPS.map((g, i) => `<div class="${rp && rp.stage.i === i ? 'on' : ''} ${i >= (s.retinolMax || 3) ? 'off' : ''}"><b>${g.label}</b><span>${g.days.map(d => WD_SHORT[d]).join('·')}</span><small>${esc(g.replaces)} 대신</small></div>`).join('')}</div>
+      ${rp ? `<p class="small" style="margin:8px 0">지금은 <b>${esc(rp.stage.label)} · ${esc(rp.text)}</b> 저녁. 2주마다 한 단계씩 올라가요. 레티놀 하는 밤엔 기기·각질 제거를 쉬고, 다음 날 아침 괄사도 쉬어요. 각질이 일어나면 '오늘 피부 고민'에서 <b>각질·건조</b>를 눌러 그날은 쉬어요.</p>
+        <div class="btn-row"><button class="btn sm" data-action="retinolMax">${(s.retinolMax || 3) === 2 ? '3단계까지 올리기' : '2단계에 머물기'}</button><button class="btn sm danger" data-action="retinolStop">그만두기</button></div>`
       : `<p class="small" style="margin:0 0 8px">피코 회복(시술 후 2주)이 끝나고 시작해요.${hasRet ? '' : " 레티놀은 '살 것'에 있어요."}</p>
         <button class="btn sm block" data-action="retinolStart">오늘부터 레티놀 시작</button>`}
     </section>`;
 }
 
+// ── 꾸준히 할 것 ──
+function renderHabits() {
+  const s = skinData(), h = s.habits || {};
+  return `<section class="card"><div class="card-h"><h2>꾸준히</h2></div>
+    ${MY_HABITS.map(x => {
+      const last = (h[x.id] || []).slice(-1)[0], due = last ? addDays(last, x.every) : today(), n = diffDays(due, today());
+      return `<div class="habit-row"><div class="info"><b>${esc(x.name)}</b><span class="small muted">${esc(x.how)}${last ? ` · 마지막 ${dateLabel(last)}` : ''}</span></div>
+        <span class="dday ${n <= 0 ? 'soon' : ''}">${n <= 0 ? '할 때' : `D-${n}`}</span><button class="btn sm" data-action="habitDone" data-id="${x.id}">${last === today() ? '취소' : '했어요'}</button></div>`;
+    }).join('')}
+    <ul class="how-list small" style="margin-top:8px">${MY_HABIT_NOTES.map(t => `<li>${esc(t)}</li>`).join('')}</ul></section>`;
+}
+// ── 괄사·마사지 가이드 ──
+function renderGuasha() {
+  const open = !!db.ui.guashaOpen;
+  return `<section class="card"><button class="row-between" style="width:100%" data-action="guashaOpen"><h2 style="margin:0">괄사 · 마사지 방법</h2><span class="chev">${open ? '▾' : '▸'}</span></button>
+    ${open ? Object.values(MY_GUASHA).map(g => `<h3 class="small" style="margin:12px 0 4px">${esc(g.title)}</h3><ul class="how-list">${g.items.map(t => `<li>${esc(t)}</li>`).join('')}</ul>`).join('') : ''}</section>`;
+}
+
+// ── 두피 ──
+function renderScalp() {
+  const k = cur, log = skinLog(k), wd = parse(k).getDay(), ps = skinData().products, canCheck = k <= today();
+  const steps = MY_SCALP.steps.filter(st => !st.days || st.days.includes(wd));
+  return `<section class="card"><div class="card-h"><h2>🚿 저녁 두피 루틴</h2><span class="meta num">${steps.filter(st => log.checks[st.key]).length}/${steps.length}</span></div>
+    <ul class="skin-list">${steps.map((st, i) => {
+      const p = st.p && ps.find(x => x.id === 'my-' + st.p && x.status !== '다씀'), on = !!log.checks[st.key];
+      return `<li><button class="skin-step ${on ? 'on' : ''}" data-action="scalpCheck" data-id="${st.key}" data-date="${k}" ${canCheck ? '' : 'disabled'}>
+        <span class="check ${on ? 'on' : ''}">${CHECK_SVG}</span>
+        <span class="info"><span class="name"><span class="st-no">${i + 1}</span>${esc(st.name)}${st.days ? ' <span class="r-tag">주 1회</span>' : ''}</span>
+        ${p ? `<span class="st-prod">${cosArtSvg(p, 'mini')}<span>${esc(p.name)}</span></span>` : ''}<span class="st-how">${esc(st.how)}</span></span></button></li>`;
+    }).join('')}</ul></section>
+    <section class="card"><div class="card-h"><h2>기억해 둘 것</h2></div><ul class="how-list">${MY_SCALP.notes.map(t => `<li>${esc(t)}</li>`).join('')}</ul></section>
+    <p class="small muted" style="margin:0 4px">스케일링은 토요일에 나와요. 샴푸·트리트먼트는 화장대 › 욕실 선반에 있어요.</p>`;
+}
+
 // ── 화장대 ──
 const VZ = {
   mirror: ['토너·에센스', '세럼·앰플', '아이크림'],
-  top: ['크림', '선크림', '베이스'],
+  top: ['크림', '선크림', '베이스', '입술'],
   clean: ['클렌징오일', '클렌저'],
   mask: ['각질제거', '마스크팩'],
   dev: ['디바이스'],
@@ -344,7 +397,7 @@ function deviceWeek(p, k = today()) {
 function renderDevices() {
   const s = skinData(), devs = s.products.filter(p => p.cat === '디바이스' && p.status !== '다씀');
   if (!devs.length) return '';
-  return `<div class="section-title" style="margin-top:18px">내 디바이스 활용</div><section class="card">${devs.map(p => {
+  return `<div class="section-title" style="margin-top:18px">내 디바이스 활용</div><section class="card"><ul class="how-list small" style="margin:0 0 6px">${DEVICE_RULES.map(t => `<li>${esc(t)}</li>`).join('')}</ul>${devs.map(p => {
     const g = deviceGuide(p), w = deviceWeek(p), log = s.devLog[p.id] || [], last = log[log.length - 1];
     const status = g?.every ? (last ? `마지막 ${dateLabel(last)} · 다음 ${dday(addDays(last, g.every)).text}` : '아직 기록 없음')
       : `이번 주 ${w.used}/${w.plan}회${w.next ? ` · 다음 ${w.next === today() ? '오늘' : WD_SHORT[parse(w.next).getDay()] + '요일'}` : ''}`;
@@ -390,12 +443,14 @@ function renderBuy() {
   const todo = MY_BUY.filter(b => st[b.id] !== 'done'), done = MY_BUY.filter(b => st[b.id] === 'done');
   const finished = s.products.filter(p => p.status === '다씀' && p.finished && diffDays(today(), p.finished) <= 30 && !s.products.some(q => q !== p && q.status !== '다씀' && q.cat === p.cat));
   return `${finished.length ? `<section class="card"><div class="card-h"><h2>최근 다 쓴 것</h2></div>${finished.map(p => `<div class="row-between small" style="padding:4px 0"><span>${esc(p.name)}</span><button class="link small" data-action="cosRebuy" data-id="${p.id}">장보기에 담기</button></div>`).join('')}</section>` : ''}
-    ${todo.map((b, i) => `<section class="card buy-item">
-      <div class="card-h"><h2>${i + 1}. ${esc(b.name)}</h2><span class="when-badge ${b.when === '지금' ? 'now' : ''}">${esc(b.when)}</span></div>
+    <p class="small" style="margin:0 4px 10px"><b>${esc(MY_BUY_RULE)}</b></p>
+    ${todo.length ? [...new Set(todo.map(x => x.group))].map(g => `<div class="section-title">${esc(g)}</div>${todo.filter(x => x.group === g).map(b => `<section class="card buy-item">
+      <div class="card-h"><h2>${esc(b.name)}</h2><span class="when-badge ${g === '지금 사기' ? 'now' : ''}">${esc(g)}</span></div>
       <p class="small" style="margin:0 0 8px">${esc(b.why)}</p>
       <div class="reco-list">${b.picks.map(shopLink).join('')}</div>
+      ${b.pickNote ? `<p class="small muted" style="margin:6px 0 0">${esc(b.pickNote)}</p>` : ''}
       <div class="btn-row" style="margin-top:10px"><button class="btn sm" data-action="buyCart" data-id="${b.id}" ${st[b.id] === 'cart' ? 'disabled' : ''}>${st[b.id] === 'cart' ? '🛒 장보기에 있어요' : '🛒 장보기에 담기'}</button><button class="btn sm primary" data-action="buyDone" data-id="${b.id}">샀어요 → 화장대</button></div>
-    </section>`).join('') || '<section class="card"><p class="empty">살 것을 다 샀어요 🎉</p></section>'}
+    </section>`).join('')}`).join('') : '<section class="card"><p class="empty">살 것을 다 샀어요 🎉</p></section>'}
     <section class="card"><div class="card-h"><h2>🙅 안 사도 되는 것</h2></div>${MY_NOBUY.map(([n, w]) => `<p class="small" style="margin:0 0 6px"><b>${esc(n)}</b> <span class="muted">— ${esc(w)}</span></p>`).join('')}</section>
     ${done.length ? `<div class="section-title">산 것 ${done.length}</div><section class="card faded">${done.map(b => `<div class="row-between small" style="padding:4px 0"><span>✓ ${esc(b.name)}</span><button class="link small" data-action="buyUndo" data-id="${b.id}">되돌리기</button></div>`).join('')}</section>` : ''}
     <p class="small muted" style="margin:6px 4px 0">검색은 쇼핑몰 사이트에서 열려요. 테스터로 먼저 확인하고 사는 걸 추천해요.</p>`;
@@ -426,6 +481,14 @@ function skinAction(a, b) {
         if (ok) { s.retinolStart = today(); save(); render(); toast('레티놀 일정을 넣었어요'); }
       });
       return true;
+    }
+    case 'retinolMax': s.retinolMax = (s.retinolMax || 3) === 2 ? 3 : 2; save(); render(); toast(s.retinolMax === 2 ? '2단계(일·수)에 머물러요' : '3단계까지 올려요'); return true;
+    case 'careSeg': db.ui.careSeg = b.dataset.v; save(); render(); return true;
+    case 'scalpCheck': { const c = skinLog(b.dataset.date || cur).checks; c[b.dataset.id] ? delete c[b.dataset.id] : (c[b.dataset.id] = true); save(); render(); return true; }
+    case 'guashaOpen': db.ui.guashaOpen = !db.ui.guashaOpen; save(); render(); return true;
+    case 'habitDone': {
+      const l = (s.habits = s.habits || {})[b.dataset.id] = s.habits[b.dataset.id] || [], i = l.indexOf(today());
+      i >= 0 ? l.splice(i, 1) : l.push(today()); save(); render(); if (i < 0) toast('기록했어요'); return true;
     }
     case 'retinolStop': ask('레티놀을 그만둘까요?', '루틴에서 레티놀 단계가 빠져요.', '그만두기', '취소', true).then(ok => { if (ok) { s.retinolStart = null; save(); render(); } }); return true;
     case 'vanityView': db.ui.vanityView = b.dataset.v; save(); render(); return true;

@@ -256,10 +256,9 @@ function renderRecipes() {
   // 냉장고 재료를 많이 쓰는 순 → 유통기한 임박 → 단백질
   const hidden = list.filter(x => recipeBlocked(x.v.raw));
   list = list.filter(x => !recipeBlocked(x.v.raw));
-  list.sort((a, b) => {
-    const sa = scoreRecipe(a.v), sb = scoreRecipe(b.v);
-    return (sb.ratio - sa.ratio) || (recipeLikeScore(b.v.raw) - recipeLikeScore(a.v.raw)) || (sb.have - sa.have) || (sb.urgent - sa.urgent) || (b.v.p - a.v.p);
-  });
+  // 내 냉장고 재료를 몇 개나 쓰는지가 먼저 (1개짜리 레시피가 3개 쓰는 레시피를 앞지르지 않게), 그다음 비율·임박·좋아요
+  const fs = (v) => { const sc = scoreRecipe(v); return sc.have * 2 + sc.ratio * 3 + (sc.urgent ? 2 : 0) + Math.min(recipeLikeScore(v.raw), 3) * 0.5; };
+  list.sort((a, b) => (fs(b.v) - fs(a.v)) || (b.v.p - a.v.p));
   const ai = db.aiRecipes || [];
   return `
   ${renderPlanCard()}
@@ -517,7 +516,8 @@ const QUICK = [
   ['부추', '단', '냉장', '채소'], ['깻잎', '봉', '냉장', '채소'], ['가지', '개', '냉장', '채소'], ['고추', '봉', '냉장', '채소'], ['숙주', '봉', '냉장', '채소'], ['청경채', '봉', '냉장', '채소'],
   ['떡볶이떡', '봉', '냉장', '밥·면·빵'], ['떡국떡', '봉', '냉동', '밥·면·빵'], ['파스타면', '봉', '실온', '밥·면·빵'], ['소면', '봉', '실온', '밥·면·빵'], ['우동면', '개', '냉장', '밥·면·빵'], ['당면', '봉', '실온', '밥·면·빵'], ['또띠아', '봉', '냉동', '밥·면·빵'],
   ['김치', '통', '냉장', '기타'], ['단무지', '개', '냉장', '기타'], ['토마토소스', '병', '실온', '기타'], ['카레', '개', '실온', '기타'], ['진미채', '봉', '냉장', '기타'], ['미역', '봉', '실온', '기타'], ['참치캔', '캔', '실온', '기타'], ['견과류', '봉', '실온', '기타'], ['김', '봉', '실온', '기타'],
-  ['단백질 파우더', '통', '실온', '기타'], ['들깨가루', '봉', '냉장', '기타'], ['꿀', '병', '실온', '기타'], ['주스', '개', '냉장', '기타'], ['생수', '병', '실온', '기타'],
+  ['순대', '팩', '냉장', '기타'], ['유부', '봉', '냉동', '기타'], ['낫또', '팩', '냉장', '달걀·두부·유제품'], ['곤약면', '봉', '냉장', '밥·면·빵'], ['곤약떡', '봉', '냉장', '밥·면·빵'], ['메밀면', '봉', '실온', '밥·면·빵'], ['쌀국수', '봉', '실온', '밥·면·빵'], ['떡갈비', '봉', '냉동', '고기·생선'], ['맛살', '봉', '냉장', '고기·생선'],
+  ['단백질 쉐이크', '통', '실온', '기타'], ['단백질 파우더', '통', '실온', '기타'], ['들깨가루', '봉', '냉장', '기타'], ['꿀', '병', '실온', '기타'], ['주스', '개', '냉장', '기타'], ['생수', '병', '실온', '기타'],
 ];
 const QUICK_CATS = ['전체', '채소', '과일', '고기·생선', '달걀·두부·유제품', '밥·면·빵', '기타'];
 function quickInfo(name) { return QUICK.find(q => q[0] === name) || QUICK.find(q => nameMatch(q[0], name)); }
@@ -631,5 +631,5 @@ function recipesForIngHtml(name) {
   return `<section class="card" style="margin-bottom:10px"><div class="card-h"><h2>🍳 이 재료로 만들 요리</h2><span class="meta num">${list.length}개</span></div>
     ${list.length ? list.slice(0, 5).map(x => `<button class="plan-slot link-row" data-x="recipe" data-key="${x.key}"><span class="ps-name">${esc(x.r.n)}${x.any ? ' <span class="r-tag">냉장고 털이</span>' : ''}<small class="num"> ${x.r.p}g · ${x.r.k}kcal${x.sc.missing.length ? ` · ${x.sc.missing.length}개 더 필요` : ' · 바로 가능'}</small></span><span class="chev">›</span></button>`).join('')
       + (list.length > 5 ? `<button class="btn block sm" data-x="ingAll" style="margin-top:6px">전체 ${list.length}개 보기</button>` : '')
-      : '<p class="empty" style="padding:6px 0">아직 이 재료를 쓰는 레시피가 없어요</p>'}</section>`;
+      : '<p class="empty" style="padding:6px 0">아직 이 재료를 쓰는 레시피가 없어요. Claude에게 “○○ 레시피 넣어줘”라고 말해 주세요.</p>'}</section>`;
 }

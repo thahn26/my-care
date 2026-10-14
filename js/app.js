@@ -1,5 +1,5 @@
 // 화면 전환 · 공통 이벤트 · 설정 · 백업
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.6.0';
 let tab = (() => { try { return sessionStorage.getItem('tab') || 'home'; } catch (e) { return 'home'; } })();
 let cur = today();
 
@@ -82,7 +82,7 @@ document.addEventListener('click', (e) => {
     case 'shopDel': db.shopping = db.shopping.filter(s => s.id !== b.dataset.id); save(); render(); break;
     case 'shopClear': db.shopping = db.shopping.filter(s => !s.done); save(); render(); break;
     case 'aiShopping': aiShopping(); break;
-    default: skinAction(a, b);
+    default: skinAction(a, b) || mineAction(a, b);
   }
 });
 
@@ -229,6 +229,7 @@ let lastDay = today();
 setInterval(() => { if (today() !== lastDay) { if (cur === lastDay) cur = today(); lastDay = today(); render(); } }, 60000);
 
 if (tab === 'kitchen' && (db.ui.kitchenTab || 'fridge') === 'fridge') fridgeAnim = true;
+installDiet();
 render();
 // 오프라인 지원 (개발용 localhost에서는 옛 파일이 남지 않게 끔)
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});

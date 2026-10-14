@@ -59,7 +59,7 @@ function renderHome() {
       ])}
       <div class="legend">
         <div class="legend-item" style="--c:${t.kcal > g.kcal ? 'var(--warn)' : 'var(--kcal)'}"><span class="dot"></span><span class="k">칼로리</span><span class="v num">${n0(t.kcal)}<small> / ${n0(g.kcal)}kcal</small></span></div>
-        <div class="legend-item" style="--c:var(--protein)"><span class="dot"></span><span class="k">단백질</span><span class="v num">${n0(t.protein)}<small> / ${g.protein}g</small></span></div>
+        <div class="legend-item" style="--c:var(--protein)"><span class="dot"></span><span class="k">단백질</span><span class="v num">${n0(t.protein)}<small> / ${g.protein}g${db.settings.proteinLimit ? ' 이하' : ''}</small></span></div>
         <div class="legend-item" style="--c:var(--water)"><span class="dot"></span><span class="k">물</span><span class="v num">${d.water || 0}<small> / ${g.water}잔</small></span></div>
       </div>
     </div>
@@ -69,7 +69,9 @@ function renderHome() {
     </div>
   </section>
 
+  ${renderSnackCard()}
   ${renderTodayPlan(cur)}
+  ${renderSuppCard(cur)}
   ${(() => { const pg = skinProgress(cur), all = pg.am.done + pg.noon.done + pg.pm.done, tot = pg.am.total + pg.noon.total + pg.pm.total;
     return `<section class="card"><button class="setup-cta" data-action="tab" data-tab="care"><span class="ic">🧴</span><span style="flex:1"><b>오늘의 피부 루틴</b><br><span class="small muted num">아침 ${pg.am.done}/${pg.am.total} · 점심 ${pg.noon.done}/${pg.noon.total} · 저녁 ${pg.pm.done}/${pg.pm.total}${skinLog(cur).concerns == null && cur === today() ? ' · 오늘 피부 고민 체크 전' : ''}</span></span><span class="num" style="font-weight:800;color:${all >= tot && tot ? 'var(--ok)' : 'var(--sub)'}">${tot ? Math.round(all / tot * 100) : 0}%</span></button></section>`; })()}
 
@@ -78,6 +80,8 @@ function renderHome() {
     <div class="alert-list">${soon.slice(0, 5).map(f => { const dd = dday(f.exp); return `<div class="alert-item"><span><b>${esc(f.name)}</b> <span class="small muted">${n1(f.qty)}${esc(f.unit)}</span></span><span class="dday ${dd.cls}">${dd.text}</span></div>`; }).join('')}</div>
     <button class="btn block sm" style="margin-top:10px" data-action="kitchen" data-sub="recipes">이 재료로 만들 요리 보기</button>
   </section>` : ''}
+
+  ${renderWeightCard()}
 
   <section class="card">
     <div class="card-h"><h2>최근 7일</h2></div>
@@ -103,8 +107,9 @@ function renderDiet() {
   return `
   <section class="card">
     ${goalBar({ label: '칼로리', value: t.kcal, goal: g.kcal, unit: 'kcal', color: 'var(--kcal)', mode: 'limit' })}
-    ${goalBar({ label: '단백질', value: t.protein, goal: g.protein, unit: 'g', color: 'var(--protein)' })}
+    ${goalBar({ label: db.settings.proteinLimit ? '단백질 (넘지 않기)' : '단백질', value: t.protein, goal: g.protein, unit: 'g', color: 'var(--protein)', mode: db.settings.proteinLimit ? 'limit' : 'reach' })}
   </section>
+  ${renderShakeCard()}
   <section class="card">
     <div class="card-h"><h2>물</h2><span class="meta num">${w} / ${g.water}잔</span></div>
     <div class="cups">${[...Array(cupCount)].map((_, i) => `<button class="cup ${i < w ? 'on' : ''}" data-action="water" data-v="${i + 1}" aria-label="물 ${i + 1}잔">${CUP_SVG}</button>`).join('')}</div>

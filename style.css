@@ -580,3 +580,29 @@ button.wk-day { color: var(--text); }
 .ci-today { position: absolute; top: 2px; left: 4px; width: 8px; height: 8px; border-radius: 50%; background: var(--skin); box-shadow: 0 0 0 2px var(--card); }
 .ci-today.inline { position: static; display: inline-block; vertical-align: middle; margin-right: 2px; }
 .cos-item .name, .cos-item .sub { display: block; }
+.ret-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.ret-steps > div { display: flex; flex-direction: column; gap: 1px; padding: 8px; border-radius: 10px; background: var(--card2); font-size: 13px; min-width: 0; }
+.ret-steps > div.on { outline: 2px solid var(--skin); }
+.ret-steps > div.off { opacity: .45; }
+.ret-steps small { color: var(--sub); font-size: 11px; line-height: 1.3; }
+.habit-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-top: .5px solid var(--line); }
+.habit-row:first-of-type { border-top: 0; }
+.habit-row .info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+/* ── 내 맞춤: 영양제·야식·체중·쉐이크 ── */
+.supp-row { display: flex; flex-direction: column; gap: 4px; padding: 6px 0; border-top: .5px solid var(--line); }
+.supp-row:first-of-type { border-top: 0; }
+.supp-when { font-size: 12px; font-weight: 700; color: var(--sub); }
+.chip.off { opacity: .5; text-decoration: line-through; }
+.snack-card { border: 1.5px solid color-mix(in srgb, #7b61ff 35%, transparent); }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 16px; }
+.snack-list { list-style: none; margin: 4px 0 0; padding: 0; font-size: 13.5px; }
+.snack-list li { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; border-top: .5px solid var(--line); }
+.snack-list li:first-child { border-top: 0; }
+.wt-chart { width: 100%; height: auto; display: block; }
+.wt-goal { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.wt-gdot { fill: var(--card); stroke: var(--muted); stroke-width: 1.5; }
+.wt-line { fill: none; stroke: var(--kcal); stroke-width: 2.5; stroke-linejoin: round; }
+.wt-dot { fill: var(--kcal); }
+.wt-lbl { font-size: 10px; fill: var(--sub); }
+.pg.shake { background: #7b61ff; font-size: 18px; }
